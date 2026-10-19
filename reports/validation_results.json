@@ -1,0 +1,463 @@
+{
+  "validated_at_utc": "2026-10-18T11:57:43.511564+00:00",
+  "webots": "R2025a",
+  "runs": [
+    {
+      "status": "success",
+      "controller": "A* with Supervisor position updates",
+      "python": "/home/aliy/miniconda3/bin/python",
+      "start": [
+        -1.4500000000053326,
+        -0.9499999999918607
+      ],
+      "goal": [
+        1.45,
+        0.95
+      ],
+      "final_position": [
+        1.4493606984450749,
+        0.9497868994816919
+      ],
+      "arena_bounds": [
+        -1.8,
+        1.8,
+        -1.3,
+        1.3
+      ],
+      "obstacle_count": 8,
+      "grid_resolution_m": 0.05,
+      "robot_radius_m": 0.037,
+      "safety_margin_m": 0.03,
+      "waypoints": [
+        [
+          -1.4500000000053326,
+          -0.9499999999918607
+        ],
+        [
+          -1.1500000000000001,
+          -0.30000000000000004
+        ],
+        [
+          1.3,
+          0.9
+        ],
+        [
+          1.45,
+          0.95
+        ]
+      ],
+      "expanded_nodes": 988,
+      "planning_seconds": 0.024901381999370642,
+      "planned_length_m": 3.602099509307829,
+      "travelled_length_m": 3.601425626314321,
+      "simulation_duration_s": 30.176000000000002,
+      "movement_steps": 939,
+      "goal_error_m": 0.0006738830084167315,
+      "min_physical_clearance_m": 0.058121425987346424,
+      "safety_violation": null,
+      "obstacles": [
+        {
+          "name": "O1 crate",
+          "kind": "crate",
+          "center": [
+            -0.9,
+            -0.55
+          ],
+          "size": [
+            0.34,
+            0.32
+          ]
+        },
+        {
+          "name": "O2 crate",
+          "kind": "crate",
+          "center": [
+            0.1,
+            0.78
+          ],
+          "size": [
+            0.36,
+            0.28
+          ]
+        },
+        {
+          "name": "O3 crate",
+          "kind": "crate",
+          "center": [
+            1.05,
+            -0.65
+          ],
+          "size": [
+            0.32,
+            0.3
+          ]
+        },
+        {
+          "name": "O4 drum",
+          "kind": "drum",
+          "center": [
+            -1.2,
+            0.7
+          ],
+          "size": [
+            0.24,
+            0.24
+          ]
+        },
+        {
+          "name": "O5 drum",
+          "kind": "drum",
+          "center": [
+            1.1,
+            0.15
+          ],
+          "size": [
+            0.26,
+            0.26
+          ]
+        },
+        {
+          "name": "O6 divider",
+          "kind": "divider",
+          "center": [
+            -0.15,
+            -0.65
+          ],
+          "size": [
+            0.1,
+            0.6
+          ]
+        },
+        {
+          "name": "O7 divider",
+          "kind": "divider",
+          "center": [
+            -0.5,
+            0.35
+          ],
+          "size": [
+            0.55,
+            0.1
+          ]
+        },
+        {
+          "name": "O8 workcell",
+          "kind": "workcell",
+          "center": [
+            0.4,
+            0.1
+          ],
+          "size": [
+            0.34,
+            0.34
+          ]
+        }
+      ]
+    },
+    {
+      "status": "success",
+      "controller": "A* with Supervisor position updates",
+      "python": "/home/aliy/miniconda3/bin/python",
+      "start": [
+        -1.4500000000053326,
+        -0.9499999999918607
+      ],
+      "goal": [
+        1.45,
+        0.95
+      ],
+      "final_position": [
+        1.4493606984450749,
+        0.9497868994816919
+      ],
+      "arena_bounds": [
+        -1.8,
+        1.8,
+        -1.3,
+        1.3
+      ],
+      "obstacle_count": 8,
+      "grid_resolution_m": 0.05,
+      "robot_radius_m": 0.037,
+      "safety_margin_m": 0.03,
+      "waypoints": [
+        [
+          -1.4500000000053326,
+          -0.9499999999918607
+        ],
+        [
+          -1.1500000000000001,
+          -0.30000000000000004
+        ],
+        [
+          1.3,
+          0.9
+        ],
+        [
+          1.45,
+          0.95
+        ]
+      ],
+      "expanded_nodes": 988,
+      "planning_seconds": 0.02932758800307056,
+      "planned_length_m": 3.602099509307829,
+      "travelled_length_m": 3.601425626314321,
+      "simulation_duration_s": 30.176000000000002,
+      "movement_steps": 939,
+      "goal_error_m": 0.0006738830084167315,
+      "min_physical_clearance_m": 0.058121425987346424,
+      "safety_violation": null,
+      "obstacles": [
+        {
+          "name": "O1 crate",
+          "kind": "crate",
+          "center": [
+            -0.9,
+            -0.55
+          ],
+          "size": [
+            0.34,
+            0.32
+          ]
+        },
+        {
+          "name": "O2 crate",
+          "kind": "crate",
+          "center": [
+            0.1,
+            0.78
+          ],
+          "size": [
+            0.36,
+            0.28
+          ]
+        },
+        {
+          "name": "O3 crate",
+          "kind": "crate",
+          "center": [
+            1.05,
+            -0.65
+          ],
+          "size": [
+            0.32,
+            0.3
+          ]
+        },
+        {
+          "name": "O4 drum",
+          "kind": "drum",
+          "center": [
+            -1.2,
+            0.7
+          ],
+          "size": [
+            0.24,
+            0.24
+          ]
+        },
+        {
+          "name": "O5 drum",
+          "kind": "drum",
+          "center": [
+            1.1,
+            0.15
+          ],
+          "size": [
+            0.26,
+            0.26
+          ]
+        },
+        {
+          "name": "O6 divider",
+          "kind": "divider",
+          "center": [
+            -0.15,
+            -0.65
+          ],
+          "size": [
+            0.1,
+            0.6
+          ]
+        },
+        {
+          "name": "O7 divider",
+          "kind": "divider",
+          "center": [
+            -0.5,
+            0.35
+          ],
+          "size": [
+            0.55,
+            0.1
+          ]
+        },
+        {
+          "name": "O8 workcell",
+          "kind": "workcell",
+          "center": [
+            0.4,
+            0.1
+          ],
+          "size": [
+            0.34,
+            0.34
+          ]
+        }
+      ]
+    },
+    {
+      "status": "success",
+      "controller": "A* with Supervisor position updates",
+      "python": "/home/aliy/miniconda3/bin/python",
+      "start": [
+        -1.4500000000053326,
+        -0.9499999999918607
+      ],
+      "goal": [
+        1.45,
+        0.95
+      ],
+      "final_position": [
+        1.4493606984450749,
+        0.9497868994816919
+      ],
+      "arena_bounds": [
+        -1.8,
+        1.8,
+        -1.3,
+        1.3
+      ],
+      "obstacle_count": 8,
+      "grid_resolution_m": 0.05,
+      "robot_radius_m": 0.037,
+      "safety_margin_m": 0.03,
+      "waypoints": [
+        [
+          -1.4500000000053326,
+          -0.9499999999918607
+        ],
+        [
+          -1.1500000000000001,
+          -0.30000000000000004
+        ],
+        [
+          1.3,
+          0.9
+        ],
+        [
+          1.45,
+          0.95
+        ]
+      ],
+      "expanded_nodes": 988,
+      "planning_seconds": 0.025320585998997558,
+      "planned_length_m": 3.602099509307829,
+      "travelled_length_m": 3.601425626314321,
+      "simulation_duration_s": 30.176000000000002,
+      "movement_steps": 939,
+      "goal_error_m": 0.0006738830084167315,
+      "min_physical_clearance_m": 0.058121425987346424,
+      "safety_violation": null,
+      "obstacles": [
+        {
+          "name": "O1 crate",
+          "kind": "crate",
+          "center": [
+            -0.9,
+            -0.55
+          ],
+          "size": [
+            0.34,
+            0.32
+          ]
+        },
+        {
+          "name": "O2 crate",
+          "kind": "crate",
+          "center": [
+            0.1,
+            0.78
+          ],
+          "size": [
+            0.36,
+            0.28
+          ]
+        },
+        {
+          "name": "O3 crate",
+          "kind": "crate",
+          "center": [
+            1.05,
+            -0.65
+          ],
+          "size": [
+            0.32,
+            0.3
+          ]
+        },
+        {
+          "name": "O4 drum",
+          "kind": "drum",
+          "center": [
+            -1.2,
+            0.7
+          ],
+          "size": [
+            0.24,
+            0.24
+          ]
+        },
+        {
+          "name": "O5 drum",
+          "kind": "drum",
+          "center": [
+            1.1,
+            0.15
+          ],
+          "size": [
+            0.26,
+            0.26
+          ]
+        },
+        {
+          "name": "O6 divider",
+          "kind": "divider",
+          "center": [
+            -0.15,
+            -0.65
+          ],
+          "size": [
+            0.1,
+            0.6
+          ]
+        },
+        {
+          "name": "O7 divider",
+          "kind": "divider",
+          "center": [
+            -0.5,
+            0.35
+          ],
+          "size": [
+            0.55,
+            0.1
+          ]
+        },
+        {
+          "name": "O8 workcell",
+          "kind": "workcell",
+          "center": [
+            0.4,
+            0.1
+          ],
+          "size": [
+            0.34,
+            0.34
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Three deterministic resets of the same static layout; no RL training and no wheel-dynamics validation."
+}

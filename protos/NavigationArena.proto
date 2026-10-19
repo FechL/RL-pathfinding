@@ -1,0 +1,55 @@
+#VRML_SIM R2025a utf8
+# template language: javascript
+PROTO NavigationArena [
+  field SFVec2f floorSize 3.6 2.6
+] {
+%< const w = fields.floorSize.value.x;
+   const h = fields.floorSize.value.y; >%
+Solid {
+  name "navigation arena"
+  children [
+    Pose {
+      translation 0 0 -0.055
+      children [ Shape {
+        appearance PBRAppearance { baseColor 0.10 0.16 0.22 roughness 0.72 metalness 0.1 }
+        geometry Box { size %<= w + 0.15 >% %<= h + 0.15 >% 0.09 }
+      } ]
+    }
+    Shape {
+      appearance PBRAppearance {
+        baseColorMap ImageTexture { url [ "../worlds/textures/navigation_lab_floor.png" ] }
+        roughness 0.95
+        metalness 0
+      }
+      geometry Plane { size IS floorSize }
+    }
+    %< for (const y of [-h / 2 - 0.025, h / 2 + 0.025]) { >%
+    Pose {
+      translation 0 %<= y >% 0.06
+      children [ Shape {
+        appearance DEF WALL PBRAppearance { baseColor 0.17 0.25 0.32 roughness 0.7 metalness 0.15 }
+        geometry Box { size %<= w + 0.10 >% 0.05 0.12 }
+      } ]
+    }
+    %< } for (const x of [-w / 2 - 0.025, w / 2 + 0.025]) { >%
+    Pose {
+      translation %<= x >% 0 0.06
+      children [ Shape {
+        appearance USE WALL
+        geometry Box { size 0.05 %<= h >% 0.12 }
+      } ]
+    }
+    %< } >%
+  ]
+  boundingObject Group {
+    children [
+      Pose { translation 0 0 -0.025 children [ Box { size %<= w >% %<= h >% 0.05 } ] }
+      %< for (const y of [-h / 2 - 0.025, h / 2 + 0.025]) { >%
+      Pose { translation 0 %<= y >% 0.06 children [ Box { size %<= w + 0.10 >% 0.05 0.12 } ] }
+      %< } for (const x of [-w / 2 - 0.025, w / 2 + 0.025]) { >%
+      Pose { translation %<= x >% 0 0.06 children [ Box { size 0.05 %<= h >% 0.12 } ] }
+      %< } >%
+    ]
+  }
+}
+}

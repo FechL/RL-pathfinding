@@ -1,0 +1,5 @@
+INFO: epuck_uts: Starting controller: /home/aliy/miniconda3/bin/python -u epuck_uts.py
+Python controller: /home/aliy/miniconda3/bin/python
+Arena: (-1.8, 1.8, -1.3, 1.3); obstacles: 8; start: (-1.4500000000053326, -0.9499999999918607); goal: (1.45, 0.95)
+Path found: 4 waypoints, 3.602 m; expanded nodes: 988
+INFO: epuck_uts: Terminating.

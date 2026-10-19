@@ -1,0 +1,13 @@
+{
+  "document": "Laporan_Simulasi_Epuck_Navigation_Lab.docx",
+  "rendered_pages": 10,
+  "visual_review": "All ten pages inspected after final render; tables, figures, headings and page numbers passed.",
+  "template_identity_and_page_geometry": "Preserved",
+  "template_sha256": "ea9bebd390b8131cb4e2ddff8d06c8baf78ac2888d408f4ac9accefc7e87a586",
+  "original_template_unchanged": true,
+  "archived_original_files_verified": 8,
+  "planner_unit_tests_passed": 8,
+  "webots_runs_passed": 3,
+  "limitations": "Static known map; Supervisor position updates; no RL training or motor-dynamics validation.",
+  "document_sha256": "e9e50f6b7a3f75161a1cff9253be2a266acc2d158778496d18818e72a6fe867c"
+}
