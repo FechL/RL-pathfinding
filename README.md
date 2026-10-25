@@ -35,10 +35,6 @@ python tools/build_world.py
 
 The same seed produces the same maze. Change `seed` to create another maze with the same dimensions.
 
-## Future RL interface
-
-The robot exposes four infrared distance readings, yaw from the IMU, position from GPS, and left/right wheel motors. A future agent can use those readings as observations and wheel speeds as continuous actions, while the current A* controller remains a deterministic baseline.
-
 ## Checks
 
 ```bash
