@@ -2,6 +2,7 @@
 # template language: javascript
 PROTO NavigationArena [
   field SFVec2f floorSize 3.6 2.6
+  field SFFloat cellSize 0.40
 ] {
 %< const w = fields.floorSize.value.x;
    const h = fields.floorSize.value.y; >%
@@ -17,7 +18,7 @@ Solid {
     }
     Shape {
       appearance PBRAppearance {
-        baseColorMap ImageTexture { url [ "../worlds/textures/navigation_lab_floor.png" ] }
+        baseColorMap ImageTexture { url [ "../worlds/textures/micromouse_floor.png" ] }
         roughness 0.95
         metalness 0
       }

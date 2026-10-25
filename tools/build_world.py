@@ -1,119 +1,193 @@
-"""Regenerate the active world and its floor texture from navigation_lab.json.
-
-Pillow is needed only for regenerating this asset, not for running Webots.
-"""
+"""Generate a deterministic micromouse maze world and floor texture."""
 import json
+import random
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-LAYOUT = json.loads((ROOT / "worlds/navigation_lab.json").read_text())
+LAYOUT = json.loads((ROOT / "worlds/maze_layout.json").read_text())
+
+
+def edge(a, b):
+    return tuple(sorted((tuple(a), tuple(b))))
+
+
+def generate_walls():
+    """Generate a connected DFS maze, then add loops and open the 2x2 goal."""
+    width, height = LAYOUT["grid_size"]
+    rng = random.Random(LAYOUT["seed"])
+    start = tuple(LAYOUT["start_cell"])
+    visited, stack, openings = {start}, [start], set()
+    while stack:
+        x, y = stack[-1]
+        neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+        neighbors = [(nx, ny) for nx, ny in neighbors
+                     if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in visited]
+        if not neighbors:
+            stack.pop()
+            continue
+        rng.shuffle(neighbors)
+        next_cell = neighbors[0]
+        openings.add(edge((x, y), next_cell))
+        visited.add(next_cell)
+        stack.append(next_cell)
+
+    goals = {tuple(cell) for cell in LAYOUT["goal_cells"]}
+    for x, y in goals:
+        for neighbor in ((x+1, y), (x-1, y), (x, y+1), (x, y-1)):
+            if neighbor in goals:
+                openings.add(edge((x, y), neighbor))
+
+    possible_loops = []
+    for y in range(height):
+        for x in range(width):
+            for neighbor in ((x+1, y), (x, y+1)):
+                if neighbor[0] < width and neighbor[1] < height:
+                    connection = edge((x, y), neighbor)
+                    if connection not in openings and not ({(x, y), neighbor} <= goals):
+                        possible_loops.append(connection)
+    rng.shuffle(possible_loops)
+    openings.update(possible_loops[:LAYOUT["loop_openings"]])
+
+    cell = LAYOUT["cell_size"]
+    thickness = LAYOUT["wall_thickness"]
+    wall_height = LAYOUT["wall_height"]
+    x_min, y_min = -width*cell/2, -height*cell/2
+    walls = []
+    for y in range(height):
+        for x in range(width):
+            if x+1 < width and edge((x, y), (x+1, y)) not in openings:
+                walls.append({
+                    "name": f"V{x}_{y}",
+                    "position": [x_min+(x+1)*cell, y_min+(y+0.5)*cell],
+                    "size": [thickness, cell+thickness, wall_height],
+                })
+            if y+1 < height and edge((x, y), (x, y+1)) not in openings:
+                walls.append({
+                    "name": f"H{x}_{y}",
+                    "position": [x_min+(x+0.5)*cell, y_min+(y+1)*cell],
+                    "size": [cell+thickness, thickness, wall_height],
+                })
+    return walls
+
+
+def cell_center(index):
+    width, height = LAYOUT["grid_size"]
+    cell = LAYOUT["cell_size"]
+    return (-width*cell/2+(index[0]+0.5)*cell,
+            -height*cell/2+(index[1]+0.5)*cell)
+
+
+def mission_points():
+    start = cell_center(LAYOUT["start_cell"])
+    goal_cells = [tuple(cell) for cell in LAYOUT["goal_cells"]]
+    goal = (sum(cell_center(cell)[0] for cell in goal_cells)/len(goal_cells),
+            sum(cell_center(cell)[1] for cell in goal_cells)/len(goal_cells))
+    return start, goal
 
 
 def floor_texture():
-    scale = 600
-    w, h = LAYOUT["arena_size"]
-    image = Image.new("RGB", (round(w * scale), round(h * scale)), "#e8ecee")
+    width, height = LAYOUT["grid_size"]
+    cell = LAYOUT["cell_size"]
+    world_w, world_h = width*cell, height*cell
+    scale = 320
+    image = Image.new("RGB", (round(world_w*scale), round(world_h*scale)), "#edf0e9")
     draw = ImageDraw.Draw(image)
 
     def xy(x, y):
-        return (round((x + w / 2) * scale), round((h / 2 - y) * scale))
+        return round((x+world_w/2)*scale), round((world_h/2-y)*scale)
 
-    for i in range(1, round(w / 0.2)):
-        x = i * 0.2 * scale
-        draw.line((x, 0, x, h * scale), fill="#d9e0e4", width=2)
-    for j in range(1, round(h / 0.2)):
-        y = j * 0.2 * scale
-        draw.line((0, y, w * scale, y), fill="#d9e0e4", width=2)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    bold_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font = ImageFont.truetype(font_path, 22)
-    bold = ImageFont.truetype(bold_path, 30)
-    small = ImageFont.truetype(font_path, 17)
-    draw.rectangle((24, 24, w * scale - 24, h * scale - 24), outline="#93a6af", width=4)
-    draw.rectangle((42, h * scale - 120, 810, h * scale - 40), fill="#233b4a")
-    draw.text((65, h * scale - 108), "E-PUCK  /  NAVIGATION LAB", fill="white", font=bold)
-    draw.text((65, h * scale - 68), "CONTINUOUS SPACE     /     OPEN LAYOUT", fill="#afc6d1", font=small)
-    draw.text((w * scale - 560, h * scale - 72), "3.6 x 2.6 m   |   GRID 0.20 m", fill="#526a78", font=font)
+    def cell_box(index):
+        x, y = index
+        top_left = xy(-world_w/2+x*cell, -world_h/2+(y+1)*cell)
+        bottom_right = xy(-world_w/2+(x+1)*cell, -world_h/2+y*cell)
+        return (*top_left, *bottom_right)
 
-    for point, color, text in [(LAYOUT["start"], "#218fc1", "START"), (LAYOUT["goal"], "#1c9e78", "GOAL")]:
-        x, y = xy(*point)
-        r = 0.17 * scale
-        draw.ellipse((x-r, y-r, x+r, y+r), fill=color)
-        draw.ellipse((x-r+9, y-r+9, x+r-9, y+r-9), outline="white", width=3)
-        draw.text((x, y+r+13), text, anchor="mt", font=bold, fill=color)
+    draw.rectangle(cell_box(LAYOUT["start_cell"]), fill="#bfe0d2")
+    for goal_cell in LAYOUT["goal_cells"]:
+        draw.rectangle(cell_box(goal_cell), fill="#f1d28e")
 
-    for ob in LAYOUT["obstacles"]:
-        x, y = xy(*ob["position"])
-        sx, sy = ob["size"][:2]
-        pad = 0.045 * scale
-        rect = (x-sx*scale/2-pad, y-sy*scale/2-pad, x+sx*scale/2+pad, y+sy*scale/2+pad)
-        if ob["kind"] == "drum":
-            draw.ellipse(rect, outline="#a9b8c0", width=3)
-        else:
-            draw.rounded_rectangle(rect, radius=9, outline="#c7ac73" if ob["kind"] == "crate" else "#a9b8c0", width=3)
-        draw.text((x, y+sy*scale/2+pad+8), ob["id"], fill="#586d7a", font=small, anchor="mt")
+    for i in range(width+1):
+        x = i*cell*scale
+        draw.line((x, 0, x, world_h*scale), fill="#c8d1cc", width=2)
+    for j in range(height+1):
+        y = j*cell*scale
+        draw.line((0, y, world_w*scale, y), fill="#c8d1cc", width=2)
+
+    regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    label_font = ImageFont.truetype(bold, 22)
+    small_font = ImageFont.truetype(regular, 15)
+    sx, sy = cell_center(LAYOUT["start_cell"])
+    gx, gy = mission_points()[1]
+    draw.text(xy(sx, sy), "START", fill="#245f52", font=label_font, anchor="mm")
+    draw.text(xy(gx, gy), "GOAL", fill="#80571c", font=label_font, anchor="mm")
+    ImageDraw.Draw(image).rectangle((2, 2, image.width-3, image.height-3), outline="#748681", width=5)
 
     folder = ROOT / "worlds/textures"
     folder.mkdir(exist_ok=True)
-    # Power-of-two texture avoids Webots allocating a larger GPU texture.
-    image.resize((2048, 2048), Image.Resampling.LANCZOS).save(folder / "navigation_lab_floor.png")
+    image.resize((2048, 2048), Image.Resampling.LANCZOS).save(folder / "micromouse_floor.png")
 
 
 def build_world():
-    w, h = LAYOUT["arena_size"]
-    sx, sy = LAYOUT["start"]
-    gx, gy = LAYOUT["goal"]
+    width, height = LAYOUT["grid_size"]
+    cell = LAYOUT["cell_size"]
+    world_w, world_h = width*cell, height*cell
+    start, goal = mission_points()
+    walls = generate_walls()
     parts = [f'''#VRML_SIM R2025a utf8
-# Generated by tools/build_world.py. See navigation_lab.json for layout dimensions.
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+# Generated by tools/build_world.py from maze_layout.json.
 EXTERNPROTO "../protos/NavigationArena.proto"
-EXTERNPROTO "../protos/LabObstacle.proto"
+EXTERNPROTO "../protos/MazeWall.proto"
+EXTERNPROTO "../protos/Micromouse.proto"
 
 WorldInfo {{
-  basicTimeStep 32
-  title "E-puck Navigation Lab"
-  info [ "Open continuous navigation arena inspired by goal navigation benchmarks." "Static obstacles and broad alternative routes. A* demonstration, no trained RL policy." ]
+  basicTimeStep 16
+  title "{LAYOUT['title']}"
+  info [ "{width} x {height} cell maze with dead ends, loops, and a 2 x 2 goal at the far end." "Micromouse uses an A* route baseline; four infrared sensors and differential-drive motors are available for future RL work." ]
 }}
 DEF OVERVIEW Viewpoint {{
-  orientation -0.29433848 0.57654846 0.76220518 1.1803250154
-  position -5.04 -6.96 7.8
-  fieldOfView 0.72
-  description "Navigation lab overview"
+  orientation -0.29 0.54 0.79 1.27
+  position -3.7 -5.7 8.5
+  fieldOfView 0.82
+  description "Micromouse maze overview"
 }}
-Background {{ skyColor [ 0.89 0.93 0.96 ] }}
+Background {{ skyColor [ 0.88 0.92 0.95 ] }}
 DirectionalLight {{ direction 0.3 0.4 -1 intensity 0.85 ambientIntensity 0.65 castShadows TRUE }}
 DirectionalLight {{ direction -0.5 -0.2 -1 intensity 0.35 ambientIntensity 0.2 }}
-DEF ARENA NavigationArena {{ floorSize {w} {h} }}
-DEF epuck E-puck {{
-  translation {sx} {sy} 0
-  rotation 0 0 1 0.58
-  name "e-puck"
-  controller "epuck"
+DEF ARENA NavigationArena {{ floorSize {world_w} {world_h} cellSize {cell} }}
+DEF MICROMOUSE Micromouse {{
+  translation {start[0]} {start[1]} 0
+  rotation 0 0 1 0
+  name "Micromouse M1"
+  controller "micromouse"
   supervisor TRUE
-  version "2"
-  window "<none>"
 }}
-DEF OBSTACLES Group {{
+DEF WALLS Group {{
   children [
 ''']
-    for ob in LAYOUT["obstacles"]:
-        x, y = ob["position"]
-        size = " ".join(map(str, ob["size"]))
-        color = " ".join(map(str, ob["color"]))
-        parts.append(f'''    DEF {ob['id']} LabObstacle {{
-      translation {x} {y} {ob['size'][2]/2}
-      size {size}
-      name "{ob['id']} {ob['kind']}"
-      kind "{ob['kind']}"
-      color {color}
+    for wall in walls:
+        x, y = wall["position"]
+        sx, sy, sz = wall["size"]
+        parts.append(f'''    MazeWall {{
+      translation {x:.4f} {y:.4f} {sz/2:.3f}
+      size {sx:.4f} {sy:.4f} {sz:.3f}
+      name "{wall['name']}"
     }}
 ''')
+    goal_size = cell*2
     parts.append(f'''  ]
 }}
-DEF GOAL Pose {{ translation {gx} {gy} 0 }}
-DEF CHECKPOINT Pose {{ translation {sx} {sy} 0 }}
+DEF START Pose {{ translation {start[0]:.4f} {start[1]:.4f} 0 }}
+DEF GOAL Pose {{ translation {goal[0]:.4f} {goal[1]:.4f} 0 }}
+DEF GOAL_MARKER Pose {{
+  translation {goal[0]:.4f} {goal[1]:.4f} 0.001
+  children [ Shape {{
+    appearance PBRAppearance {{ baseColor 0.92 0.66 0.23 transparency 0.25 roughness 1 }}
+    geometry Box {{ size {goal_size:.3f} {goal_size:.3f} 0.001 }}
+  }} ]
+}}
 ''')
     (ROOT / "worlds/world.wbt").write_text("".join(parts))
 
@@ -121,4 +195,4 @@ DEF CHECKPOINT Pose {{ translation {sx} {sy} 0 }}
 if __name__ == "__main__":
     floor_texture()
     build_world()
-    print("Built world.wbt and floor texture")
+    print(f"Built {len(generate_walls())} maze walls for {LAYOUT['title']}")

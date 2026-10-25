@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import heapq
 import math
 
-ROBOT_RADIUS = 0.037
-SAFETY_MARGIN = 0.03
+ROBOT_RADIUS = 0.075
+SAFETY_MARGIN = 0.012
 GRID_RESOLUTION = 0.05
 
 

@@ -1,0 +1,11 @@
+{
+  "title": "Micromouse Maze Arena",
+  "grid_size": [16, 16],
+  "cell_size": 0.40,
+  "wall_thickness": 0.05,
+  "wall_height": 0.18,
+  "seed": 20261025,
+  "loop_openings": 10,
+  "start_cell": [0, 0],
+  "goal_cells": [[14, 14], [14, 15], [15, 14], [15, 15]]
+}

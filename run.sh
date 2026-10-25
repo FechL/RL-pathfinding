@@ -6,7 +6,7 @@ base_python="$HOME/miniconda3/bin/python"
 
 if [[ ! -x "$base_python" ]]; then
     echo "Miniconda base Python not found: $base_python" >&2
-    echo "Update base_python in run.sh and COMMAND in controllers/epuck/runtime.ini." >&2
+    echo "Update base_python in run.sh and COMMAND in controllers/micromouse/runtime.ini." >&2
     exit 1
 fi
 
