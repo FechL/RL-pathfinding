@@ -1,10 +1,12 @@
-"""Rule-based micromouse baseline: A* global route plus differential-drive control."""
+"""Q-learning motion options plus continuous differential-drive motor control."""
 import json
 import math
 import os
 from pathlib import Path
 import sys
 import time
+
+from q_learning import policy_path
 
 from planner import (GRID_RESOLUTION, ROBOT_RADIUS, SAFETY_MARGIN, Obstacle,
                      distance, path_length, physical_clearance, plan_path)
@@ -51,17 +53,18 @@ def read_scene(supervisor):
 
 
 class MapView:
-    def __init__(self, start, goal, walls, bounds, path, explored, cell_size, show):
+    def __init__(self, start, goal, walls, bounds, path, explored, cell_size, show, algorithm="Q-Learning"):
         import cv2
         import numpy as np
         self.cv2, self.np, self.show = cv2, np, show
         self.bounds, self.start, self.goal = bounds, start, goal
         self.walls, self.path, self.explored = walls, path, explored
         self.cell_size = cell_size
+        self.algorithm = algorithm
         self.scale, self.pad, self.header = 230, 42, 78
         self.width = round((bounds[1]-bounds[0])*self.scale)+2*self.pad
         self.height = round((bounds[3]-bounds[2])*self.scale)+self.header+2*self.pad
-        self.title = "Micromouse M1 - A* Maze Solver"
+        self.title = f"Micromouse M1 - {algorithm} Maze Solver"
         self.background = self.draw_background()
         self.last_image = self.background.copy()
         if show:
@@ -81,7 +84,7 @@ class MapView:
         image = np.full((self.height, self.width, 3), (235, 239, 233), dtype=np.uint8)
         cv2.rectangle(image, (0, 0), (self.width, self.header), (42, 57, 62), -1)
         self.text(image, "MICROMOUSE M1 / MAZE SOLVER", (22, 33), 0.75, (255, 255, 255), 2)
-        self.text(image, f"{len(self.walls)} walls | {self.cell_size*100:.0f} cm cells | A* route | {len(self.explored)} expanded cells", (23, 60), 0.43, (196, 215, 212))
+        self.text(image, f"{len(self.walls)} walls | {self.cell_size*100:.0f} cm cells | {self.algorithm} route | {len(self.explored)} route samples", (23, 60), 0.43, (196, 215, 212))
         lo = self.pixel((self.bounds[0], self.bounds[3]))
         hi = self.pixel((self.bounds[1], self.bounds[2]))
         cv2.rectangle(image, lo, hi, (144, 158, 153), 2)
@@ -175,15 +178,25 @@ def main():
     if capture:
         Path(capture).mkdir(parents=True, exist_ok=True)
     timer = time.perf_counter()
-    path, explored = plan_path(start, goal, walls, bounds)
+    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
+    policy_metadata = None
+    if algorithm == "q_learning":
+        policy_file = Path(os.environ.get("MICROMOUSE_POLICY", str(PROJECT / "models/q_learning.json")))
+        path, explored, policy_metadata = policy_path(start, goal, walls, bounds, cell_size, policy_file)
+        algorithm_label = "Q-Learning"
+    elif algorithm == "astar":
+        path, explored = plan_path(start, goal, walls, bounds)
+        algorithm_label = "A*"
+    else:
+        raise ValueError("MICROMOUSE_ALGORITHM must be q_learning or astar")
     planning_seconds = time.perf_counter()-timer
     print(f"Controller: {sys.executable}")
     print(f"Maze: {round((bounds[1]-bounds[0])/cell_size)} x {round((bounds[3]-bounds[2])/cell_size)} cells; walls: {len(walls)}; start: {start}; goal: {goal}")
     if path:
-        print(f"A* route found: {len(path)} waypoints, {path_length(path):.2f} m; expanded cells: {len(explored)}")
+        print(f"{algorithm_label} route found: {len(path)} waypoints, {path_length(path):.2f} m; expanded cells: {len(explored)}")
     else:
-        print("A* could not find a route to the goal")
-    view = MapView(start, goal, walls, bounds, path, explored, cell_size, show)
+        print(f"{algorithm_label} could not find a route to the goal")
+    view = MapView(start, goal, walls, bounds, path, explored, cell_size, show, algorithm_label)
     trail, current_index, steps = [start], 1, 0
     clearance = physical_clearance(start, walls, bounds)
     current = start
@@ -265,7 +278,9 @@ def main():
     sensor_values = {name: sensor.getValue() for name, sensor in distance_sensors.items()}
     result = {
         "status": "success" if completed else "failed",
-        "controller": "A* with differential-drive micromouse following",
+        "controller": f"{algorithm_label} with differential-drive micromouse following",
+        "algorithm": algorithm,
+        "policy_metadata": policy_metadata,
         "python": sys.executable,
         "maze_size_cells": [round((bounds[1]-bounds[0])/cell_size), round((bounds[3]-bounds[2])/cell_size)],
         "cell_size_m": cell_size,

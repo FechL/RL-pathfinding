@@ -1,0 +1,47 @@
+INFO: micromouse: Starting controller: /home/aliy/miniconda3/bin/python -u micromouse.py
+Controller: /home/aliy/miniconda3/bin/python
+Maze: 16 x 16 cells; walls: 213; start: (-3.0, -3.000000000005909); goal: (2.8, 2.8)
+Q-Learning route found: 43 waypoints, 16.68 m; expanded cells: 43
+Reached waypoint 2/43
+Reached waypoint 3/43
+Reached waypoint 4/43
+Reached waypoint 5/43
+Reached waypoint 6/43
+Reached waypoint 7/43
+Reached waypoint 8/43
+Reached waypoint 9/43
+Reached waypoint 10/43
+Reached waypoint 11/43
+Reached waypoint 12/43
+Reached waypoint 13/43
+Reached waypoint 14/43
+Reached waypoint 15/43
+Reached waypoint 16/43
+Reached waypoint 17/43
+Reached waypoint 18/43
+Reached waypoint 19/43
+Reached waypoint 20/43
+Reached waypoint 21/43
+Reached waypoint 22/43
+Reached waypoint 23/43
+Reached waypoint 24/43
+Reached waypoint 25/43
+Reached waypoint 26/43
+Reached waypoint 27/43
+Reached waypoint 28/43
+Reached waypoint 29/43
+Reached waypoint 30/43
+Reached waypoint 31/43
+Reached waypoint 32/43
+Reached waypoint 33/43
+Reached waypoint 34/43
+Reached waypoint 35/43
+Reached waypoint 36/43
+Reached waypoint 37/43
+Reached waypoint 38/43
+Reached waypoint 39/43
+Reached waypoint 40/43
+Reached waypoint 41/43
+Reached waypoint 42/43
+Reached waypoint 43/43
+INFO: micromouse: Terminating.

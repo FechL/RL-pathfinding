@@ -17,18 +17,21 @@ from planner import Obstacle, ROBOT_RADIUS, segment_is_free
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--algorithm", choices=("q_learning", "astar"), default="q_learning")
     args = parser.parse_args()
-    report = ROOT / "reports"
+    if args.runs < 1:
+        parser.error("runs must be positive")
+    report = ROOT / "reports" / f"{args.algorithm}_webots"
     figures = report / "figures"
     figures.mkdir(parents=True, exist_ok=True)
     records = []
     for number in range(1, args.runs+1):
         with tempfile.TemporaryDirectory(prefix="micromouse-maze-run-") as tmp:
             project = Path(tmp)
-            for folder in ("controllers", "worlds", "protos"):
+            for folder in ("controllers", "worlds", "protos", "models"):
                 shutil.copytree(ROOT / folder, project / folder)
             env = os.environ.copy()
-            env.update(MICROMOUSE_TEST_EXIT="1", MICROMOUSE_NO_GUI="1", MICROMOUSE_RESULTS_DIR=str(project / "results"))
+            env.update(MICROMOUSE_ALGORITHM=args.algorithm, MICROMOUSE_TEST_EXIT="1", MICROMOUSE_NO_GUI="1", MICROMOUSE_RESULTS_DIR=str(project / "results"))
             if number == 1:
                 env["MICROMOUSE_CAPTURE_DIR"] = str(project / "captures")
             else:
@@ -37,12 +40,13 @@ def main():
             if number > 1:
                 command.append("--no-rendering")
             command.append(str(project / "worlds/world.wbt"))
-            process = subprocess.run(command, env=env, text=True, capture_output=True, timeout=300)
+            process = subprocess.run(command, env=env, text=True, capture_output=True, timeout=600)
             log = process.stdout+process.stderr
             (report / f"webots_run_{number}.log").write_text(log)
             assert process.returncode == 0, log
             data = json.loads((project / "results/latest_run.json").read_text())
             assert data["status"] == "success", data
+            assert data["algorithm"] == args.algorithm, data
             assert data["python"] == str(Path.home()/"miniconda3/bin/python"), data["python"]
             assert data["goal_error_m"] <= .06
             assert data["min_physical_clearance_m"] >= .005
@@ -57,7 +61,7 @@ def main():
                     shutil.copy2(image, figures / image.name)
             print(f"Run {number}: success; length={data['planned_length_m']:.3f} m; error={data['goal_error_m']:.6f} m; clearance={data['min_physical_clearance_m']:.4f} m", flush=True)
     result = {"validated_at_utc": datetime.now(timezone.utc).isoformat(), "webots": "R2025a", "runs": records,
-              "scope": "Three deterministic resets of the 16 x 16 maze solve; A* uses the known wall map and a differential-drive robot, no RL training."}
+              "scope": f"{args.runs} deterministic physics resets on the fixed 16 x 16 maze; selected algorithm drives real wheel motors. Q-learning, when selected, was trained separately in a kinematic option model."}
     (report / "validation_results.json").write_text(json.dumps(result, indent=2)+"\n")
 
 

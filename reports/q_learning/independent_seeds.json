@@ -1,0 +1,16 @@
+[
+  {
+    "seed": 43,
+    "success": true,
+    "steps": 41,
+    "collisions": 0,
+    "last_100_success_rate": 1.0
+  },
+  {
+    "seed": 44,
+    "success": true,
+    "steps": 41,
+    "collisions": 0,
+    "last_100_success_rate": 1.0
+  }
+]

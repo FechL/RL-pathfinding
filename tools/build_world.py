@@ -145,7 +145,7 @@ EXTERNPROTO "../protos/Micromouse.proto"
 WorldInfo {{
   basicTimeStep 16
   title "{LAYOUT['title']}"
-  info [ "{width} x {height} cell maze with dead ends, loops, and a 2 x 2 goal at the far end." "Micromouse uses an A* route baseline; four infrared sensors and differential-drive motors are available for future RL work." ]
+  info [ "{width} x {height} cell maze with dead ends, loops, and a 2 x 2 goal at the far end." "Micromouse uses a trained Q-learning option policy with continuous differential-drive wheel control." ]
 }}
 DEF OVERVIEW Viewpoint {{
   orientation -0.29 0.54 0.79 1.27

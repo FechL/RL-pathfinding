@@ -1,12 +1,10 @@
-# Micromouse Maze Arena
+# Micromouse Q-Learning in a Continuous Environment
 
-A Webots R2025a micromouse simulation with a small differential-drive robot in a deterministic 16 × 16 maze. Each cell is 40 cm, so the arena is 6.4 × 6.4 m. The maze has dead ends, extra loop openings, and a 2 × 2 goal zone at the far corner opposite the start.
+Webots R2025a micromouse navigation in a fixed 16 × 16 maze (6.4 × 6.4 m). The default controller follows motion options selected by a trained tabular Q-learning policy. An A* baseline remains available explicitly.
 
-The current baseline uses A* for route planning and wheel motors for movement. The robot has four infrared wall sensors, GPS, an IMU, and wheel encoders. The sensors and motor actions provide a starting point for a later RL controller; no RL policy or training is included now. A* reads the known maze geometry through Webots Supervisor, so the current baseline is not sensor-only.
+The physical robot has continuous XY position and yaw. Q-learning discretizes XY into 256 cell bins and learns four high-level motion options (east, north, west, south). A GPS/IMU feedback servo executes the options with differential-drive wheel velocities. This is high-level navigation RL, not direct wheel-velocity learning. The complete static wall map is known; IR is logged rather than used for routing.
 
-## Run
-
-Install Webots R2025a and Miniconda, then from the project folder run:
+## Run the learned policy
 
 ```bash
 conda activate base
@@ -14,32 +12,42 @@ python -m pip install -r requirements.txt
 bash run.sh
 ```
 
-Webots opens `worlds/world.wbt`. The OpenCV window displays the maze, explored cells, planned route, and mouse position. The robot moves with its differential-drive wheel motors. Use Reset or Reload in Webots to restart.
+The included `models/q_learning.json` was trained for 6,000 episodes with seed 42. No training is required to run it. Set `MICROMOUSE_NO_GUI=1` to hide only the OpenCV window. Webots itself requires a usable graphical session. Python defaults to `~/miniconda3/bin/python`; change `run.sh` and `controllers/micromouse/runtime.ini` if needed. Webots supplies the `controller` module; do not install it from PyPI.
 
-To hide the OpenCV map window while keeping the Webots GUI open:
+To run the earlier baseline:
 
 ```bash
-MICROMOUSE_NO_GUI=1 bash run.sh
+MICROMOUSE_ALGORITHM=astar bash run.sh
 ```
 
-The Python path defaults to `~/miniconda3/bin/python`. If yours is different, update `base_python` in `run.sh` and `COMMAND` in `controllers/micromouse/runtime.ini`. Webots provides the `controller` Python module; do not install it from PyPI.
+## Train and evaluate
 
-## Maze layout
+```bash
+python tools/train_q_learning.py --episodes 6000 --seed 42 --evaluation-runs 100
+python -m unittest discover -s tests -v
+python tools/validate_simulation.py --runs 3 --algorithm q_learning
+```
 
-`worlds/maze_layout.json` controls the grid size, cell width, maze seed, loop openings, start cell, and center goal cells. Regenerate the maze world and floor texture with:
+Training runs in a continuous XY kinematic option model using the actual world wall geometry and exact swept-disc collision checks. Reset and landing positions have uniform noise of ±0.015 m. No A*, shortest-path demonstrations, action masks, or route-label supervision are used. With 80% probability, an episode in the first 80% of training starts at a random nonterminal cell; all remaining episodes start at the real mission start. This exploring-starts curriculum helps sparse goal rewards propagate. Evaluation always uses the mission start, a separate random seed stream and epsilon 0. Time-limit truncation keeps the Bellman bootstrap; goal termination removes it.
+
+Rewards: +100 on entering the goal zone, -1 per valid move, -10 for a blocked option (pose unchanged). Alpha 0.2, gamma 0.99, epsilon max(0.03, 0.999^episode), 600 decisions per episode. The Q-table has 1,024 values. A scene fingerprint rejects stale models after geometry changes. Once the learned policy enters the 2 × 2 goal room, the existing servo docks at its centre. There is no A* fallback if Q-learning fails.
+
+Training produces `reports/q_learning/training.csv`, `summary.json`, and `evaluations.json`. Physics validation independently runs actual wheel motors in Webots and writes `reports/q_learning_webots/validation_results.json`, three logs, and screenshots. The validator checks final goal error, physical clearance, and every recorded trajectory segment. `results/latest_run.json` records an interactive run.
+
+## Recorded results
+
+For seed 42: 100/100 noisy kinematic evaluations succeed without blocked options; the deterministic greedy policy reaches the goal zone in 41 options (16.4 m). Seeds 43 and 44 independently learn the same 41-option result on this fixed maze. These seeds do not represent different maze layouts.
+
+Three deterministic Webots resets reach the goal centre within 0.034 m, with minimum disc clearance above 0.087 m. See the JSON logs for actual measurements. Repeated deterministic physics runs establish repeatability on this map, not statistical generalization to unknown worlds or hardware.
+
+## Maze generation
+
+`worlds/maze_layout.json` controls size, seed, loops, start, and goal. To change it:
 
 ```bash
 python -m pip install Pillow
 python tools/build_world.py
+python tools/train_q_learning.py
 ```
 
-The same seed produces the same maze. Change `seed` to create another maze with the same dimensions.
-
-## Checks
-
-```bash
-python -m unittest discover -s tests -v
-python tools/validate_simulation.py
-```
-
-The validator runs three deterministic maze solves and saves results to `reports/validation_results.json`.
+Reload the generated world. Training reads wall geometry from `worlds/world.wbt`, so save/regenerate it before retraining. The earlier files directly under `reports/validation_results.json` and `reports/webots_run_*.log` belong to a previous E-puck baseline and are not current Q-learning evidence.

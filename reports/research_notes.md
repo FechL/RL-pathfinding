@@ -1,13 +1,9 @@
-# Micromouse maze design notes
+# Continuous environment Q-learning experiment
 
-## Current simulation
+Updated 1 November 2026. The default route now comes from tabular Q-learning. The A* planner is retained only for explicit baseline selection and geometry helper reuse. Learning and rollout do not invoke `plan_path`.
 
-The arena is a 16 × 16 grid with 40 cm cells, for a total floor area of 6.4 × 6.4 m. A seeded depth-first maze generator creates dead ends; ten additional passages add alternate routes. The goal occupies four cells at the corner opposite the start. With the current seed, the generated world contains 213 internal wall segments.
+Physical state is continuous XY/yaw; the policy bins XY at 0.40 m and chooses four cell-sized motion options. The low-level GPS/IMU wheel controller handles yaw. Training is performed in a kinematic XY option environment with continuous reset/landing noise, known world geometry and exact swept-disc collision checks. No wheel dynamics are learned during this stage. The first 4,800 episodes use exploring starts with probability 0.8; the last 1,200 always use the mission start.
 
-A* searches an eight-connected 5 cm lattice. Every edge and smoothed path segment is checked against the rectangular wall footprints and the mouse radius. The baseline controller drives two wheel motors and uses GPS plus an IMU to follow the route. Four infrared distance sensors and wheel encoders are exposed on the robot for future sensor-based control.
+Current evidence is under `reports/q_learning` and `reports/q_learning_webots`. The former records training and noisy kinematic evaluation; the latter records actual differential-drive physics runs. Seeds 42, 43, and 44 are training seeds on the same maze, not separate layouts. The three Webots runs are deterministic resets, not independent randomized trials.
 
-The current planner reads the complete maze map through Webots Supervisor. The infrared readings are not used to select the route, and there is no RL policy or training loop. A future RL controller can instead use the distance sensors, IMU, and odometry as observations and wheel velocities as actions.
-
-## Evidence and limits
-
-`reports/validation_results.json` and `reports/webots_run_*.log` are retained from the earlier E-puck prototype; rerun `tools/validate_simulation.py` before using them as evidence for the micromouse. The simulation uses static walls and a simplified micromouse model. Successful simulation runs do not establish transfer to competition hardware.
+Earlier E-puck validation under the top-level reports folder and older videos are historical baseline material and must not be presented as learned-policy evidence. See the new report for limitations and reproduction commands.
