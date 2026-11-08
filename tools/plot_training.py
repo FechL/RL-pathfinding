@@ -110,7 +110,13 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         raise NoTrainingData(f'No training or evaluation data in {report}')
     manifest_path = report/'run.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
-    algorithm = {'naf':'NAF','rl':'SAC tanpa panduan rute'}.get(str(manifest.get('algorithm')).lower(),'SAC')
+    algorithm_key = str(manifest.get('algorithm', '')).lower()
+    if algorithm_key == 'naf':
+        algorithm = 'NAF'
+    elif manifest.get('route_guidance', True):
+        algorithm = 'SAC dengan panduan rute'
+    else:
+        algorithm = 'SAC tanpa panduan rute'
     dt = float(manifest.get('control_dt_s', .064))
     if not math.isfinite(dt) or dt <= 0:
         raise ValueError('Control dt must be positive and finite')
