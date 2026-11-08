@@ -2,3 +2,12 @@ __pycache__/
 *.py[cod]
 results/
 archive
+.venv/
+models/*.zip
+models/*.pkl
+reports/continuous/runs/
+reports/naf/runs/
+reports/naf/models/
+reports/rl/runs/
+reports/rl/**/models/*.zip
+reports/rl/**/models/*.pkl

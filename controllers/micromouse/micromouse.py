@@ -1,4 +1,4 @@
-"""Q-learning motion options plus continuous differential-drive motor control."""
+"""Continuous NAF and SAC control, with legacy Q-learning and A* baselines."""
 import json
 import math
 import os
@@ -7,14 +7,15 @@ import sys
 import time
 
 from q_learning import policy_path
+from motion_metrics import motion_metrics
 
 from planner import (GRID_RESOLUTION, ROBOT_RADIUS, SAFETY_MARGIN, Obstacle,
                      distance, path_length, physical_clearance, plan_path)
 
 WHEEL_RADIUS = 0.027
 AXLE_TRACK = 0.104
-LINEAR_SPEED = 0.18
-TURN_SPEED = 2.8
+LINEAR_SPEED = float(os.environ.get("MICROMOUSE_BASELINE_SPEED", "0.18"))
+TURN_SPEED = float(os.environ.get("MICROMOUSE_BASELINE_TURN_SPEED", "2.8"))
 TARGET_TOLERANCE = 0.035
 PROJECT = Path(__file__).resolve().parents[2]
 
@@ -116,7 +117,9 @@ class MapView:
                        goal[1]+round(self.cell_size*self.scale)), (77, 151, 208), 2)
         self.text(image, "START", (start[0]+12, start[1]+25), 0.38, (30, 125, 87))
         self.text(image, "GOAL", (goal[0]+18, goal[1]-18), 0.38, (56, 115, 170))
-        self.text(image, "Blue: planned route | Green: start | Orange: 2 x 2 goal", (self.pad, self.height-14), 0.40)
+        legend = (f"Yellow: driven trajectory | {self.algorithm}" if self.algorithm.endswith("continuous control")
+                  else "Blue: planned route | Green: start | Orange: 2 x 2 goal")
+        self.text(image, legend, (self.pad, self.height-14), 0.40)
         return image
 
     def update(self, position, heading, trail):
@@ -148,6 +151,12 @@ def main():
     except ImportError as error:
         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
 
+    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "sac")
+    if algorithm in ("naf", "sac", "rl", "rl_unguided"):
+        from continuous_webots import run
+        run(Supervisor(), algorithm)
+        return
+
     supervisor = Supervisor()
     timestep = int(supervisor.getBasicTimeStep())
     if supervisor.step(timestep) == -1:
@@ -178,7 +187,6 @@ def main():
     if capture:
         Path(capture).mkdir(parents=True, exist_ok=True)
     timer = time.perf_counter()
-    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
     policy_metadata = None
     if algorithm == "q_learning":
         policy_file = Path(os.environ.get("MICROMOUSE_POLICY", str(PROJECT / "models/q_learning.json")))
@@ -188,7 +196,7 @@ def main():
         path, explored = plan_path(start, goal, walls, bounds)
         algorithm_label = "A*"
     else:
-        raise ValueError("MICROMOUSE_ALGORITHM must be q_learning or astar")
+        raise ValueError("MICROMOUSE_ALGORITHM must be naf, sac, rl, rl_unguided, q_learning or astar")
     planning_seconds = time.perf_counter()-timer
     print(f"Controller: {sys.executable}")
     print(f"Maze: {round((bounds[1]-bounds[0])/cell_size)} x {round((bounds[3]-bounds[2])/cell_size)} cells; walls: {len(walls)}; start: {start}; goal: {goal}")
@@ -198,6 +206,9 @@ def main():
         print(f"{algorithm_label} could not find a route to the goal")
     view = MapView(start, goal, walls, bounds, path, explored, cell_size, show, algorithm_label)
     trail, current_index, steps = [start], 1, 0
+    wheel_times, wheel_commands = [], []
+    telemetry = []
+    active_wheels = [0.0, 0.0]
     clearance = physical_clearance(start, walls, bounds)
     current = start
     heading = 0.0
@@ -217,6 +228,9 @@ def main():
     while path and supervisor.step(timestep) != -1:
         current = tuple(gps.getValues()[:2])
         heading = imu.getRollPitchYaw()[2]
+        time_s = supervisor.getTime()-began
+        telemetry.append(dict(time_s=time_s, pose=[*current, heading],
+                              commanded_wheels=active_wheels))
         current_clearance = physical_clearance(current, walls, bounds)
         clearance = min(clearance, current_clearance)
         if current_clearance < 0:
@@ -263,6 +277,10 @@ def main():
 
         left_motor.setVelocity(left_speed)
         right_motor.setVelocity(right_speed)
+        active_wheels = [left_speed, right_speed]
+        telemetry[-1]["commanded_wheels"] = active_wheels
+        wheel_times.append(time_s)
+        wheel_commands.append(active_wheels)
         steps += 1
         if steps % 4 == 0:
             view.update(current, heading, trail)
@@ -300,11 +318,14 @@ def main():
         "travelled_length_m": path_length(trail),
         "simulation_duration_s": supervisor.getTime()-began,
         "movement_steps": steps,
+        "baseline_limits": {"linear_speed_m_s": LINEAR_SPEED, "turn_wheel_speed_rad_s": TURN_SPEED},
+        "motion": motion_metrics(wheel_times,wheel_commands),
         "goal_error_m": distance(final, goal),
         "min_physical_clearance_m": clearance,
         "safety_violation": violation,
         "sensor_readings": sensor_values,
         "trajectory": trail,
+        "telemetry": telemetry,
         "walls": [{"name": wall.name, "center": wall.center, "size": wall.size} for wall in walls],
     }
     (output / "latest_run.json").write_text(json.dumps(result, indent=2)+"\n")
