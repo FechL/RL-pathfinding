@@ -185,7 +185,9 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
     else:
         for ax in axes[1]:
             ax.text(.5,.5,'Evaluasi checkpoint belum tersedia',ha='center',va='center',transform=ax.transAxes)
-    fig.text(.08,.092,'Posisi start dan kesulitan latihan berubah. Episode pendek dapat berakhir menabrak; bukan selalu lebih cepat.',fontsize=9,color=GRAY)
+    training_note = ('Setiap episode latihan dimulai dari start misi.' if manifest.get('mission_only') else
+                     'Posisi start dan kesulitan latihan berubah.')
+    fig.text(.08,.092,training_note+' Episode pendek dapat berakhir menabrak; bukan selalu lebih cepat.',fontsize=9,color=GRAY)
     evaluation_note = ('Evaluasi kinematik memakai policy deterministik dari start misi dan posisi dekat goal.'
                        if all('local_runs' in row for row in checkpoints) and checkpoints else
                        'Evaluasi memakai start misi dan policy deterministik pada model kinematik.')
@@ -226,14 +228,17 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         ax.legend(frameon=False)
         _save(outcomes, output/'episode_outcomes.png')
         plt.close(outcomes)
+    curriculum_note = ('Training memakai start misi tetap.' if manifest.get('mission_only') else
+                       'Training curriculum changes; checkpoint evaluations use mission starts.')
     metadata = dict(completed_episodes=len(episodes),completed_episode_steps=sum(r['steps'] for r in episodes),
                     checkpoint_evaluations=len(checkpoints),rolling_window=window,control_dt_s=dt,
                     episode_success_recorded=bool(episodes) and all('is_success' in r for r in episodes),
+                    mission_only=bool(manifest.get('mission_only',False)),
                     sources=[str(report/'training.monitor.csv'),str(report/'checkpoints.json')],
                     notes=['Short failed episodes are not faster solves.',
                            'Duplicate final checkpoint omitted only if values match.',
                            'Unknown historic success/collision data are not inferred from rewards.',
-                           'Training curriculum changes; checkpoint evaluations use mission starts.',
+                           curriculum_note,
                            'Kinematic training/evaluation, not Webots physics.'])
     output.mkdir(parents=True,exist_ok=True)
     (output/'plot_data.json').write_text(json.dumps(metadata,indent=2)+'\n')
