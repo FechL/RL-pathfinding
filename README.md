@@ -1,71 +1,59 @@
-# Micromouse Continuous Control
+# Micromouse Continuous SAC with a Hidden Goal
 
-Webots R2025a micromouse in a known, fixed 16 × 16 maze (6.4 × 6.4 m).
-The default controller is **Soft Actor-Critic (SAC)** with continuous forward
-velocity and yaw-rate actions. The old tabular Q-learning and A* controllers
-remain explicit comparison baselines.
-
-## Reinforcement learning from the mission start
-
-`rl` fine-tunes continuous SAC using the local corridor bearing from the known
-maze, while the policy chooses continuous forward velocity and yaw rate. The
-guide supplies a learning observation and distance-to-goal reward. It does not
-issue motor commands. Each episode starts at the original pose and uses the
-original goal. Training initializes from the saved Tugas 7 SAC checkpoint, so
-the agent can spend its updates improving a policy that already reaches the
-goal. Fine-tuning keeps the checkpoint's reward, replay and learned entropy
-settings consistent, uses a conservative `1e-7` optimizer rate, clears stale
-optimizer momentum and applies one gradient update per four simulation steps.
-The deployed action still comes from the RL actor.
-An optional `--teacher-anchor-weight N` adds an action-deviation penalty; this
-changes the reward and starts with a fresh replay buffer.
+The default learner uses **continuous Soft Actor-Critic (SAC)** in the fixed
+16 × 16 Webots maze. The actor outputs real-valued forward speed and yaw rate;
+it receives five continuous IR ranges, wheel speeds, continuous GPS position,
+heading, and a one-bit yellow-camera reading. The policy and reward do not use
+the goal coordinates or goal distance. It succeeds when the camera detects
+the yellow floor tile. A collision ends the episode with a penalty; a separate
+180-second timeout prevents an episode from running forever.
 
 ```bash
-bash run.sh train --algorithm rl
-bash run.sh train --algorithm rl --render-speed 1
-bash run.sh train --algorithm rl --timeout 240 --render-speed 16
-bash run.sh train --algorithm rl --episodes 1000 --no-render
-bash run.sh train --algorithm rl --no-render --steps 20000 --activate
-bash run.sh graphs --report-dir reports/rl_guided/mission_seed42
+bash run.sh train                         # training animation + live metrics
+bash run.sh train --algorithm rl          # same continuous hidden-goal SAC
+bash run.sh train --render-speed 16       # faster visible preview
+bash run.sh train --no-render             # fastest training, logs still saved
+bash run.sh train --steps 100000 --exploration-fraction 0.75
+bash run.sh sim                           # Webots robot run; hidden-goal actor
+bash run.sh sim --fast                    # Webots simulation speed mode
+bash run.sh graphs                        # graphs for the newest training run
 ```
 
-The preview targets 8× simulated time by default. Use `--render-speed 1`
-for real time or `--no-render` to run without display throttling. Preview speed
-does not change the robot's motor limits or the amount of simulated time per
-episode. An episode continues until goal, collision or the configured timeout
-(180 simulated seconds by default), even if the robot stops moving. The preview
-shows `TIMEOUT` on a time-limit ending. Headless training produces the same
-episode logs and graphs. An explicit `--activate` installs a model for
-`bash run.sh sim --algorithm rl` only when it passes all three full-maze
-kinematic checks. The selected actor is saved as `models/rl_actor.json`.
+Training has two SAC phases. The first uses higher entropy for **exploration**;
+the second lowers target entropy for **exploitation**. Actions remain continuous
+in both phases. The live local window shows the robot moving from the mission
+start, its trajectory, continuous state values, all five IR readings, the
+yellow sensor bit, reward, steps, success/collision rates, critic Q estimate,
+actor/critic loss, and entropy. Q here is SAC's critic estimate, not a Q-table.
+There is no web service: `run.sh` starts the local simulator and monitor.
 
-For `rl`, the live 2D window also shows episode reward, recent goal/collision
-rates, the SAC critics' sampled Q estimate, actor/critic loss, and entropy
-coefficient. The Q curve is a SAC critic estimate, not a tabular Q-learning
-table. Training writes `training_metrics.csv` and refreshes
-`figures/q_learning.png` at evaluation checkpoints. Headless runs keep the CSV
-and saved graphs without opening a window.
-
-`--episodes 1000` runs exactly 1,000 whole episodes, with a timeout on each.
-It evaluates the mission start every 100 episodes. A candidate replaces the
-best checkpoint only when all three fixed seeds reach the goal and its mean
-time improves; otherwise training restores the last fully successful actor.
-
-The guided starting checkpoint completed three Webots resets from the
-original start in 52.576 s each. Its source and mission evaluation are under
-`reports/rl_guided/mission_seed42/`.
-
-The earlier no-guide experiment remains under `reports/rl/`. It reached 10/10
-near-goal tests, but did not solve the full maze from scratch after 100,000
-steps. To reproduce that experiment, add `--no-route-guide`. Its Webots
-controller is selected with `--algorithm rl_unguided`.
-
-To replay one of the successful near-goal Webots trials:
+Each run is kept under `reports/continuous_hidden_goal/runs/`. It saves the
+continuous state/action samples in `state_space.csv`, episode reward/steps and
+outcomes in `training.monitor.csv`, SAC metrics in `training_metrics.csv`, and
+plots including `figures/state_space.png`, `figures/episode_steps.png`, reward,
+success/collision, Q, losses, and entropy. The policy candidate is saved inside that run's
+`models/` folder. To try a candidate in Webots without replacing the default:
 
 ```bash
-MICROMOUSE_POLICY="$PWD/reports/rl/webots_local/policy.json" \
-MICROMOUSE_RL_RESET_POSE='[2.7672628296425374,2.334539578005887,-1.123959379735806]' \
-bash run.sh sim --algorithm rl_unguided
+bash run.sh sim --policy reports/continuous_hidden_goal/runs/<run>/models/hidden_goal_actor.json --fast
+```
+
+`--activate` installs a policy as the default only after all fixed-seed
+kinematic evaluations reach the goal. Training and evaluation use a kinematic
+surrogate; validate successful policies in Webots physics separately. The
+training preview speed (`--render-speed`) changes wall-clock playback only;
+`--no-render` removes display delays. Webots simulation can use `--fast`.
+
+## Legacy guided continuous SAC
+
+The older known-goal SAC and guided fine-tuning modes remain available by
+selecting `sac` or `guided_rl` explicitly. They use a goal vector and shaped
+distance reward, unlike the default hidden-goal task.
+
+```bash
+bash run.sh train --algorithm sac --warm-start
+bash run.sh train --algorithm guided_rl
+bash run.sh sim --algorithm sac
 ```
 
 ## Tugas 8 — Continuous Deep Q-Learning
@@ -259,45 +247,39 @@ Regenerate the included training figures without retraining:
 bash run.sh graphs
 ```
 
-Open `reports/continuous/figures/training_progress.png` for reward, episode
-duration, mission-start completion time and checkpoint success rate. A larger
-evaluation-time chart is saved as `evaluation_time.png`. These are plots of
-kinematic training/evaluation, separate from the Webots physics benchmark.
-Historical CSVs contain only reward, episode length and wall-clock time;
-per-episode success or collisions are not inferred from those values.
-New runs explicitly log success, collision, simulated duration and goal error.
+The newest hidden-goal run is selected by default. Its `figures/` folder has
+`training_progress.png`, `episode_steps.png`, `episode_outcomes.png`,
+`q_learning.png`, and `state_space.png`. These show kinematic training and
+evaluation; validate policies in Webots physics separately. Historical runs
+under `reports/continuous/` used known-goal guidance and have different logs.
 
 All training runs from the same shell entry point: `bash run.sh train`.
-It opens a local 2D maze window showing the robot's actual training movements,
-trail, episode, accumulated reward and collision/goal status. The preview
-also shows the initial driving demonstrations; during network updates the
-phase label changes and the robot remains still. The default preview speed
-is 8x simulation time for SAC and real time for `bash run.sh train --algorithm naf`.
+It opens a local 2D maze window showing the robot's training movements, trail,
+episode, reward, continuous state and sensor values, and collision/yellow status.
+The phase label changes from exploration to exploitation. The default preview
+speed is 8x simulation time for SAC and real time for `bash run.sh train --algorithm naf`.
 Use `bash run.sh train --render-speed 1` for real-time SAC preview,
 or `bash run.sh train --no-render` for fast training without a window.
 Press Q/Esc or close the window to stop; during SAC, partial training is
-saved and evaluated. Stopping during preparation ends that stage immediately.
+saved as a run candidate and evaluated.
 This is a kinematic training preview, not Webots 3D physics training.
 
 Training prints progress to the terminal and saves local PNG graphs; no web
 service or browser is needed. `bash run.sh` runs the trained robot in Webots,
 and `bash run.sh graphs` regenerates the saved training figures.
 
-PNGs refresh automatically after each evaluation and at the end. To refresh
-them every five seconds for a specific run:
+PNGs refresh after each evaluation and at the end. To refresh them every five
+seconds for a specific run:
 
 ```bash
 bash run.sh graphs --report-dir reports/continuous/runs/my_run --watch
 ```
 
-The faint lines show individual training episodes; thick lines show a trailing
-mean over up to 20 episodes. Training starts and difficulty change, and a short
-episode can be a crash. Use mission-start success and completion time to judge
-driving quality, rather than assuming reward or episode duration alone proves
-improvement. The included plots cover fine-tuning from an existing model after
-demonstration warm start, not the complete history from zero. Current best
-evaluation time is 52.651 seconds at 140,000 accumulated steps; the final
-220,000-step checkpoint is slightly slower, so the faster valid actor is kept.
+The faint lines show individual episodes; thick lines show a rolling mean over
+up to 20 episodes. Hidden-goal training always starts at the mission start; a
+short episode may be a collision. Check success rate and state-space plots as
+well as reward and episode length. The recorded results later in this README
+describe earlier known-goal SAC/NAF runs, not the new hidden-goal task.
 
 ## Verify and compare
 

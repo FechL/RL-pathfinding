@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
+import re
 import shutil
 import sys
 import time
@@ -16,9 +17,36 @@ sys.path.insert(0,str(ROOT/'controllers/micromouse'))
 sys.path.insert(0,str(ROOT/'tools'))
 
 
-def navigation(*, guided=True):
-    from train_q_learning import read_world
+def sensor_maze():
+    """Build training sensor geometry; only the camera simulator sees yellow cells."""
+    from planner import Obstacle
+    text = (ROOT/'worlds/world.wbt').read_text()
+    layout = json.loads((ROOT/'worlds/maze_layout.json').read_text())
+    walls = []
+    for block in re.findall(r'\bMazeWall\s*\{([^{}]+)\}', text):
+        position = list(map(float, re.search(r'translation\s+([^\n]+)', block)[1].split()))
+        size = list(map(float, re.search(r'size\s+([^\n]+)', block)[1].split()))
+        name = re.search(r'name\s+"([^"]+)"', block)[1]
+        walls.append(Obstacle(name, 'wall', tuple(position[:2]), tuple(size[:2])))
+    arena = re.search(r'DEF ARENA NavigationArena\s*\{\s*floorSize\s+(\S+)\s+(\S+)\s+cellSize\s+(\S+)', text)
+    start_match = re.search(r'DEF MICROMOUSE Micromouse\s*\{\s*translation\s+(\S+)\s+(\S+)', text)
+    if not walls or not arena or not start_match:
+        raise ValueError('Webots maze walls, arena, or start pose are missing')
+    width, height, cell_size = map(float, arena.groups())
+    if layout['grid_size'] != [round(width/cell_size), round(height/cell_size)]:
+        raise ValueError('Regenerate worlds/world.wbt after changing maze_layout.json')
+    start = tuple(map(float, start_match.groups()))
+    bounds = (-width/2, width/2, -height/2, height/2)
+    return start, walls, bounds, cell_size, layout['goal_cells']
+
+
+def navigation(*, guided=True, hidden_goal=False):
     from continuous_control import NavigationMap
+    if hidden_goal:
+        start, walls, bounds, cell_size, yellow_cells = sensor_maze()
+        return NavigationMap(start, None, walls, bounds, cell_size, guided=False,
+                             hidden_goal=True, goal_cells=yellow_cells)
+    from train_q_learning import read_world
     env = read_world()
     return NavigationMap(env.start,env.goal,env.walls,env.bounds,env.cell_size,guided=guided)
 
@@ -65,6 +93,16 @@ def main():
     parser.add_argument('--warm-start',action=argparse.BooleanOptionalAction,default=False,help='Explicit continuous driving demonstration pretraining')
     parser.add_argument('--no-route-guide',action='store_true',help='Learn with SAC using Euclidean goal progress and no Dijkstra or demonstrations')
     parser.add_argument('--rl-mode',action='store_true',help='Train a continuous RL policy for the selected route-guidance mode')
+    parser.add_argument('--hidden-goal',action='store_true',
+                        help='Use continuous SAC with five IR ranges and a yellow camera flag; no goal coordinates or distance reward')
+    parser.add_argument('--exploration-fraction',type=float,default=.75,
+                        help='Fraction of training kept in high-entropy exploration before low-entropy exploitation')
+    parser.add_argument('--exploration-entropy',type=float,default=.05,
+                        help='Initial SAC entropy coefficient in the exploration stage')
+    parser.add_argument('--exploitation-target-entropy',type=float,default=-4.,
+                        help='Lower target entropy used in the exploitation stage')
+    parser.add_argument('--state-log-every',type=int,default=20,
+                        help='Save a continuous state/action sample every N environment steps')
     parser.add_argument('--mission-only',action=argparse.BooleanOptionalAction,default=False,
                         help='Reset every training episode to the exact mission start')
     parser.add_argument('--timeout',type=float,help='Episode limit in simulated seconds for training and mission evaluation')
@@ -82,12 +120,22 @@ def main():
     if args.episodes is not None and args.steps is not None:
         parser.error('Choose either --episodes or --steps, not both.')
     if args.episodes is not None and args.episodes<1: parser.error('--episodes must be positive')
+    if args.hidden_goal and args.episodes is not None and args.episodes<2:
+        parser.error('Hidden-goal training needs at least two episodes for both learning stages')
     if args.steps is None: args.steps=300000
     if args.steps<1: parser.error('steps must be positive')
     if args.eval_every_episodes<1: parser.error('--eval-every-episodes must be positive')
     if args.no_route_guide and args.warm_start:
         parser.error('The no-route-guide mode learns without demonstrations.')
-    if args.mission_only and not (args.no_route_guide or args.rl_mode):
+    if args.hidden_goal and (args.warm_start or args.teacher_anchor_weight):
+        parser.error('Hidden-goal training cannot use demonstrations or a teacher action anchor.')
+    if args.hidden_goal and args.no_route_guide:
+        parser.error('--hidden-goal already disables route guidance.')
+    if not 0 < args.exploration_fraction < 1 or args.exploration_entropy <= 0:
+        parser.error('exploration-fraction must be between zero and one and exploration-entropy must be positive')
+    if args.exploitation_target_entropy >= 0 or args.state_log_every < 1:
+        parser.error('exploitation-target-entropy must be negative and state-log-every must be positive')
+    if args.mission_only and not (args.no_route_guide or args.rl_mode or args.hidden_goal):
         parser.error('--mission-only is available for RL training.')
     if not math.isfinite(args.render_speed) or args.render_speed<=0:parser.error('render-speed must be positive and finite')
     if args.timeout is not None and (not math.isfinite(args.timeout) or args.timeout<=0):
@@ -104,15 +152,18 @@ def main():
     from continuous_env import ContinuousDriveEnv
     from continuous_control import read_policy
     torch.set_num_threads(1)
-    nav=navigation(guided=not args.no_route_guide)
+    nav=navigation(guided=not args.no_route_guide,hidden_goal=args.hidden_goal)
     timeout_seconds = args.timeout if args.timeout is not None else nav.config.max_seconds
     evaluation_steps = math.ceil(timeout_seconds / nav.config.dt)
     training_steps = evaluation_steps
-    algorithm='rl' if args.rl_mode and nav.guided else ('sac' if nav.guided else 'rl_unguided')
-    actor_name='continuous_actor.json' if algorithm=='sac' else 'rl_actor.json' if nav.guided else 'rl_unguided_actor.json'
-    report_root=ROOT/'reports'/('continuous' if algorithm=='sac' else 'rl_guided' if nav.guided else 'rl')
-    reward_description=('12 * geodesic progress' if nav.guided else '12 * Euclidean goal progress')
-    reward_description+=' - elapsed seconds - wheel slew penalty; +30 goal; -15 collision'
+    algorithm='hidden_goal' if args.hidden_goal else ('rl' if args.rl_mode and nav.guided else ('sac' if nav.guided else 'rl_unguided'))
+    actor_name='hidden_goal_actor.json' if args.hidden_goal else 'continuous_actor.json' if algorithm=='sac' else 'rl_actor.json' if nav.guided else 'rl_unguided_actor.json'
+    report_root=ROOT/'reports'/('continuous_hidden_goal' if args.hidden_goal else 'continuous' if algorithm=='sac' else 'rl_guided' if nav.guided else 'rl')
+    reward_description=('-0.01 per step - IR near-wall penalty - wheel slew penalty; +200 yellow camera; -25 collision; no goal-distance reward'
+                       if args.hidden_goal else
+                       ('12 * geodesic progress' if nav.guided else '12 * Euclidean goal progress')+
+                       ' - elapsed seconds - wheel slew penalty; +30 goal; -15 collision')
+    discount_gamma=.9995 if args.hidden_goal else .995
     if args.rl_mode and nav.guided and args.teacher_anchor_weight:
         reward_description+=' - teacher action deviation penalty'
     if args.evaluate_only:
@@ -120,7 +171,7 @@ def main():
         report.mkdir(parents=True,exist_ok=True)
         actor,_=read_policy(args.policy or ROOT/'models'/actor_name,nav,algorithm)
         records=evaluate(actor,nav,max_steps=evaluation_steps)
-        if not nav.guided and not args.mission_only:
+        if not nav.guided and not args.hidden_goal and not args.mission_only:
             local_records=evaluate(actor,nav,seeds=range(2010,2020),max_steps=200,local=True)
             (report/'local_evaluation.json').write_text(json.dumps(local_records,indent=2)+'\n')
             print(f"Near goal: {sum(r['is_success'] for r in local_records)}/{len(local_records)}",flush=True)
@@ -154,12 +205,14 @@ def main():
         from training_view import TrainingView
         viewer=TrainingView(nav,args.render_speed)
         base.reset(seed=args.seed)
-        viewer.stage=('Menyiapkan training' if args.warm_start else
+        viewer.stage=('Eksplorasi SAC continuous (goal sensor kuning)' if args.hidden_goal else
+                      'Menyiapkan training' if args.warm_start else
                       'Training RL (SAC)' if args.rl_mode else
                       'Training SAC tanpa rute' if not nav.guided else 'Training SAC')
         viewer.update(base,force=True)
         base.step_callback=viewer.update
-    env=Monitor(base,str(report/'training'),info_keywords=('is_success','collision','time_s','goal_error_m'))
+    info_keywords=('is_success','collision','time_s') + (() if args.hidden_goal else ('goal_error_m',))
+    env=Monitor(base,str(report/'training'),info_keywords=info_keywords)
     if args.rl_mode and nav.guided and args.resume is None and not args.warm_start:
         args.resume=ROOT/'models/sac_continuous.zip'
         print(f'Initializing guided RL from trained SAC checkpoint {args.resume.name}',flush=True)
@@ -175,8 +228,9 @@ def main():
             replay_loaded=True
     else:
         model=SAC('MlpPolicy',env,learning_rate=3e-4,buffer_size=200000,learning_starts=2000,
-                  batch_size=128,tau=.005,gamma=.995,train_freq=4,gradient_steps=2,
-                  ent_coef='auto_0.05',target_entropy=-2.,policy_kwargs=dict(net_arch=[64,64]),seed=args.seed,device='cpu',verbose=0)
+                  batch_size=128,tau=.005,gamma=discount_gamma,train_freq=4,gradient_steps=2,
+                  ent_coef=f'auto_{args.exploration_entropy}' if args.hidden_goal else 'auto_0.05',
+                  target_entropy=-2.,policy_kwargs=dict(net_arch=[64,64]),seed=args.seed,device='cpu',verbose=0)
     model.route_guidance=nav.guided
     if args.learning_rate is not None or (args.rl_mode and nav.guided):
         learning_rate=args.learning_rate or 1e-7
@@ -197,13 +251,24 @@ def main():
         initial_steps=initial_steps,requested_new_steps=args.steps if args.episodes is None else None,
         control_dt_s=nav.config.dt,
         warm_start=args.warm_start,route_guidance=nav.guided,algorithm=algorithm,
-        mission_only=args.mission_only,
+        mission_only=bool(args.mission_only or args.hidden_goal),
+        state_vector_fields=nav.metadata().get('observation_fields'),
+        hidden_goal_sensor=bool(args.hidden_goal),
+        observation_schema=nav.metadata().get('observation','legacy continuous navigation observation'),
+        exploration_fraction=args.exploration_fraction if args.hidden_goal else None,
+        exploration_entropy=args.exploration_entropy if args.hidden_goal else None,
+        exploitation_target_entropy=args.exploitation_target_entropy if args.hidden_goal else None,
+        phase_description=('high SAC entropy exploration followed by lower-entropy exploitation'
+                           if args.hidden_goal else None),
+        goal_location_input=('yellow camera flag only; no coordinates or distance reward'
+                             if args.hidden_goal else 'legacy continuous navigation observation'),
         training_timeout_s=training_steps*nav.config.dt,
         evaluation_timeout_s=evaluation_steps*nav.config.dt,
         reward=reward_description,
         teacher_policy_sha256=teacher_sha,teacher_anchor_weight=base.teacher_anchor_weight,
         replay_buffer_loaded=replay_loaded,
         learning_rate=model.learning_rate,
+        discount_gamma=discount_gamma,
         target_entropy=model.target_entropy,
         initial_entropy_coefficient=float(model.ent_coef_tensor.item()) if model.ent_coef_optimizer is None else float(model.log_ent_coef.exp().item()),
         requested_episodes=args.episodes,
@@ -244,7 +309,7 @@ def main():
         mean_time=sum(r['time_s'] for r in records)/len(records)
         evaluations.append(dict(stage=stage,steps=model.num_timesteps,successes=successes,runs=len(records),mean_time_s=mean_time))
         print(f'Evaluation {stage}: {successes}/{len(records)} success; mean time={mean_time:.3f}s',flush=True)
-        if not nav.guided and not args.mission_only:
+        if not nav.guided and not args.hidden_goal and not args.mission_only:
             local=evaluate(actor,nav,seeds=range(2010,2020),max_steps=200,local=True)
             local_successes=sum(r['is_success'] for r in local)
             local_time=sum(r['time_s'] for r in local if r['is_success'])/max(1,local_successes)
@@ -255,7 +320,8 @@ def main():
                 best_local=score
                 shutil.copyfile(candidate,model_dir/'rl_local_actor.json')
                 (report/'local_evaluation.json').write_text(json.dumps(local,indent=2)+'\n')
-        updated_rl=(not algorithm.startswith('rl') or model.num_timesteps>initial_steps)
+        updated_rl=((not algorithm.startswith('rl') and not args.hidden_goal) or
+                    model.num_timesteps>initial_steps)
         if updated_rl and successes==len(records) and mean_time<best_time:
             best_time,best_records=mean_time,records
             best_actor_state=copy.deepcopy(model.actor.state_dict())
@@ -295,13 +361,27 @@ def main():
             self.metrics_logger=None
             self.original_logger_record=None
             self.last_metrics_timestep=None
+            self.phase='eksplorasi' if args.hidden_goal else 'continuous'
+            self.state_file=None
+            self.state_writer=None
 
         def _on_training_start(self):
             self.training_metrics_file=(report/'training_metrics.csv').open('w',newline='')
             self.training_metrics_writer=csv.DictWriter(
                 self.training_metrics_file,
-                fieldnames=('timesteps','q_value_mean','actor_loss','critic_loss','entropy_coefficient'))
+                fieldnames=('timesteps','phase','target_entropy','q_value_mean','actor_loss','critic_loss','entropy_coefficient'),
+                lineterminator='\n')
             self.training_metrics_writer.writeheader()
+            if args.hidden_goal:
+                self.state_file=(report/'state_space.csv').open('w',newline='')
+                self.state_writer=csv.DictWriter(self.state_file,fieldnames=(
+                    'timesteps','episode','phase','state_vector','x_m','y_m','heading_rad',
+                    'wheel_left_rad_s','wheel_right_rad_s','ir_front_left_m','ir_front_right_m',
+                    'ir_left_m','ir_rear_m','ir_right_m','yellow_detected',
+                    'action_forward_m_s','action_yaw_rate_rad_s','episode_reward','collision','success'),
+                    lineterminator='\n')
+                self.state_writer.writeheader()
+                self.state_file.flush()
 
             # Capture SAC's real training losses directly from its logger.
             # The logger is configured by learn() before this callback runs.
@@ -334,6 +414,8 @@ def main():
                 if viewer:viewer.record_training_metric('train/q_value_mean',q_value)
             self.training_metrics_writer.writerow(dict(
                 timesteps=self.model.num_timesteps,
+                phase=self.phase,
+                target_entropy=self.model.target_entropy,
                 q_value_mean=self.last_training_metrics.get('train/q_value_mean',''),
                 actor_loss=self.last_training_metrics.get('train/actor_loss',''),
                 critic_loss=self.last_training_metrics.get('train/critic_loss',''),
@@ -349,12 +431,14 @@ def main():
                 self.metrics_logger.record=self.original_logger_record
             if self.training_metrics_file is not None:
                 self.training_metrics_file.close()
+            if self.state_file is not None:
+                self.state_file.close()
 
         def _on_step(self):
             if viewer:
                 if viewer.closed:return False
-            # Broad random starts followed by a mixture including mission start.
-            if not args.mission_only:
+            # Random/near-goal curricula are disabled for the hidden-goal task.
+            if not args.mission_only and not args.hidden_goal:
                 base.curriculum=min(1.,.25+.75*self.n_calls/(args.steps*.6))
                 base.mission_probability=.5 if self.n_calls>args.steps*.8 else 0.
             for done,info in zip(self.locals['dones'],self.locals['infos']):
@@ -364,11 +448,67 @@ def main():
                     if viewer:
                         episode=info.get('episode',{})
                         viewer.record_episode(episode.get('r',base.episode_return),
-                                              info.get('is_success',False),info.get('collision',False))
+                                              info.get('is_success',False),info.get('collision',False),
+                                              episode.get('l',base.steps))
+            if args.hidden_goal and self.phase=='eksplorasi':
+                if args.episodes is None:
+                    switch = self.n_calls >= max(1, round(args.steps*args.exploration_fraction))
+                else:
+                    switch_after = max(1, min(args.episodes-1,
+                                              round(args.episodes*args.exploration_fraction)))
+                    switch = self.completed_episodes >= switch_after
+                if switch:
+                    self.phase='eksploitasi'
+                    self.model.target_entropy=float(args.exploitation_target_entropy)
+                    if viewer:
+                        viewer.stage='Eksploitasi continuous SAC (entropi rendah)'
+                    print(f'Memasuki fase eksploitasi pada step {self.model.num_timesteps}; target entropy={self.model.target_entropy:g}',flush=True)
+            done_now=any(self.locals['dones'])
+            if self.state_writer is not None and (self.n_calls%args.state_log_every==0 or done_now):
+                terminal_info=next((info for done,info in zip(self.locals['dones'],self.locals['infos']) if done),None)
+                terminal_state=terminal_info.get('terminal_observation') if terminal_info else None
+                if terminal_state is not None:
+                    state_vector=np.asarray(terminal_state,dtype=np.float32).reshape(-1)
+                    xmin,xmax,ymin,ymax=base.nav.bounds
+                    position=np.array([xmin+(state_vector[7]+1)*.5*(xmax-xmin),
+                                       ymin+(state_vector[8]+1)*.5*(ymax-ymin)])
+                    heading=math.atan2(float(state_vector[9]),float(state_vector[10]))
+                    state_wheels=state_vector[:2]*base.config.wheel_limit
+                    state_ir=state_vector[2:7]
+                    state_yellow=bool(state_vector[11])
+                    action0,action1=map(float,terminal_info.get('last_action',(0.,0.)))
+                    episode_reward=terminal_info.get('episode',{}).get('r',base.episode_return)
+                    collision=terminal_info.get('collision',False)
+                    success=terminal_info.get('is_success',False)
+                    episode_index=max(1,base.episode_index-1)
+                else:
+                    state_vector=base.nav.observation(base.pose,base.wheels,
+                        ir_values=base.last_ir,yellow_detected=base.last_yellow)
+                    position=base.pose[:2];heading=base.pose[2]
+                    state_wheels=base.wheels
+                    state_ir=base.last_ir
+                    state_yellow=base.last_yellow
+                    action0,action1=map(float,base.last_action)
+                    episode_reward=base.episode_return
+                    collision=base.last_collision;success=base.last_success
+                    episode_index=base.episode_index
+                ranges=np.clip(state_ir,0.,1.)*.4
+                self.state_writer.writerow(dict(timesteps=self.model.num_timesteps,
+                    episode=episode_index,phase=self.phase,
+                    state_vector=json.dumps(state_vector.astype(float).tolist(),separators=(',',':')),
+                    x_m=position[0],y_m=position[1],heading_rad=heading,
+                    wheel_left_rad_s=state_wheels[0],wheel_right_rad_s=state_wheels[1],
+                    ir_front_left_m=ranges[0],ir_front_right_m=ranges[1],ir_left_m=ranges[2],
+                    ir_rear_m=ranges[3],ir_right_m=ranges[4],yellow_detected=state_yellow,
+                    action_forward_m_s=(action0+1)*.5*base.config.max_linear,
+                    action_yaw_rate_rad_s=action1*base.config.max_angular,
+                    episode_reward=episode_reward,collision=collision,success=success))
+                self.state_file.flush()
             if viewer:
                 viewer.set_progress(self.model.num_timesteps,self.completed_episodes)
-            self.logger.record('curriculum/distance_fraction',base.curriculum)
-            self.logger.record('curriculum/mission_start_probability',base.mission_probability)
+            if not args.hidden_goal:
+                self.logger.record('curriculum/distance_fraction',base.curriculum)
+                self.logger.record('curriculum/mission_start_probability',base.mission_probability)
             if self.episode_info:
                 self.logger.record('episodes/success_rate_100',sum(r['is_success'] for r in self.episode_info)/len(self.episode_info))
                 self.logger.record('episodes/collision_rate_100',sum(r['collision'] for r in self.episode_info)/len(self.episode_info))
@@ -382,7 +522,7 @@ def main():
             if args.episodes is None and self.n_calls%20000==0:
                 assess('sac_checkpoint')
             elif args.episodes is not None and self.completed_episodes>=self.next_episode_evaluation:
-                print(f'Completed episodes={self.completed_episodes}/{args.episodes}; steps={self.n_calls}',flush=True)
+                print(f'Completed episodes={self.completed_episodes}/{args.episodes}; steps={self.n_calls}; phase={self.phase}',flush=True)
                 assess('episode_checkpoint')
                 self.next_episode_evaluation+=args.eval_every_episodes
             if args.episodes is not None and self.completed_episodes>=args.episodes:
@@ -402,6 +542,8 @@ def main():
         total_timesteps=args.steps
     model.learn(total_timesteps=total_timesteps,callback=Progress(),reset_num_timesteps=False)
     assess('final_sac')
+    if args.hidden_goal and not policy.exists():
+        shutil.copyfile(report/'candidate_actor.json',policy)
     model.save(model_dir/'sac_continuous')
     model.save_replay_buffer(model_dir/'sac_continuous.replay.pkl')
     model.logger.dump(model.num_timesteps)
@@ -414,8 +556,11 @@ def main():
     (report/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     env.close()
     if viewer:viewer.close()
-    if algorithm.startswith('rl') and not best_records:
-        print('Full maze not solved on all seeds; no policy activated for the full maze.',flush=True)
+    if (algorithm.startswith('rl') or args.hidden_goal) and not best_records:
+        if args.hidden_goal:
+            print(f'Goal not solved on all evaluation seeds; latest actor candidate: {policy.resolve()}',flush=True)
+        else:
+            print('Full maze not solved on all seeds; no policy activated for the full maze.',flush=True)
         if args.activate:
             raise SystemExit(1)
         return

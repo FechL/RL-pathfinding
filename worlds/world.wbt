@@ -7,7 +7,7 @@ EXTERNPROTO "../protos/Micromouse.proto"
 WorldInfo {
   basicTimeStep 16
   title "Micromouse Maze Arena"
-  info [ "16 x 16 cell maze with dead ends, loops, and a 2 x 2 goal at the far end." "Micromouse uses a trained Q-learning option policy with continuous differential-drive wheel control." ]
+  info [ "16 x 16 cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses continuous SAC actions, infrared sensors, and a yellow color camera." ]
 }
 DEF OVERVIEW Viewpoint {
   orientation -0.29 0.54 0.79 1.27
@@ -1100,7 +1100,7 @@ DEF GOAL Pose { translation 2.8000 2.8000 0 }
 DEF GOAL_MARKER Pose {
   translation 2.8000 2.8000 0.001
   children [ Shape {
-    appearance PBRAppearance { baseColor 0.92 0.66 0.23 transparency 0.25 roughness 1 }
+    appearance PBRAppearance { baseColor 1 0.90 0.0 roughness 0.95 }
     geometry Box { size 0.800 0.800 0.001 }
   } ]
 }

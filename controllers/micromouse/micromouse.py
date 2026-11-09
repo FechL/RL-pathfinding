@@ -109,14 +109,15 @@ class MapView:
             points = np.array([self.pixel(p) for p in self.path], dtype=np.int32)
             cv2.polylines(image, [points], False, (33, 136, 198), 3, cv2.LINE_AA)
         start = self.pixel(self.start)
-        goal = self.pixel(self.goal)
         cv2.circle(image, start, 12, (45, 157, 111), 3)
-        cv2.rectangle(image, (goal[0]-round(self.cell_size*self.scale),
-                              goal[1]-round(self.cell_size*self.scale)),
-                      (goal[0]+round(self.cell_size*self.scale),
-                       goal[1]+round(self.cell_size*self.scale)), (77, 151, 208), 2)
         self.text(image, "START", (start[0]+12, start[1]+25), 0.38, (30, 125, 87))
-        self.text(image, "GOAL", (goal[0]+18, goal[1]-18), 0.38, (56, 115, 170))
+        if self.goal is not None:
+            goal = self.pixel(self.goal)
+            cv2.rectangle(image, (goal[0]-round(self.cell_size*self.scale),
+                                  goal[1]-round(self.cell_size*self.scale)),
+                          (goal[0]+round(self.cell_size*self.scale),
+                           goal[1]+round(self.cell_size*self.scale)), (77, 151, 208), 2)
+            self.text(image, "GOAL", (goal[0]+18, goal[1]-18), 0.38, (56, 115, 170))
         legend = (f"Yellow: driven trajectory | {self.algorithm}" if self.algorithm.endswith("continuous control")
                   else "Blue: planned route | Green: start | Orange: 2 x 2 goal")
         self.text(image, legend, (self.pad, self.height-14), 0.40)
@@ -151,8 +152,8 @@ def main():
     except ImportError as error:
         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
 
-    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "sac")
-    if algorithm in ("naf", "sac", "rl", "rl_unguided"):
+    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "hidden_goal")
+    if algorithm in ("naf", "sac", "rl", "rl_unguided", "hidden_goal"):
         from continuous_webots import run
         run(Supervisor(), algorithm)
         return
@@ -196,7 +197,7 @@ def main():
         path, explored = plan_path(start, goal, walls, bounds)
         algorithm_label = "A*"
     else:
-        raise ValueError("MICROMOUSE_ALGORITHM must be naf, sac, rl, rl_unguided, q_learning or astar")
+        raise ValueError("MICROMOUSE_ALGORITHM must be hidden_goal, naf, sac, rl, rl_unguided, q_learning or astar")
     planning_seconds = time.perf_counter()-timer
     print(f"Controller: {sys.executable}")
     print(f"Maze: {round((bounds[1]-bounds[0])/cell_size)} x {round((bounds[3]-bounds[2])/cell_size)} cells; walls: {len(walls)}; start: {start}; goal: {goal}")

@@ -20,18 +20,25 @@ case "$mode" in
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_naf.py" --render --render-speed 1 "$@"
                         ;;
-                    rl)
+                    rl|hidden_goal)
+                        shift 2
+                        exec "$training_python" "$project_dir/tools/train_continuous.py" --hidden-goal --render "$@"
+                        ;;
+                    guided_rl)
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_continuous.py" --rl-mode --mission-only --learning-rate 1e-7 --render "$@"
                         ;;
-                    sac) shift 2 ;;
+                    sac)
+                        shift 2
+                        exec "$training_python" "$project_dir/tools/train_continuous.py" --warm-start --render "$@"
+                        ;;
                     *)
-                        echo "Pilih algoritma training: naf, sac, atau rl." >&2
+                        echo "Pilih algoritma training: hidden_goal (atau rl), sac, guided_rl, atau naf." >&2
                         exit 2
                         ;;
                 esac
             fi
-            exec "$training_python" "$project_dir/tools/train_continuous.py" --warm-start --render "$@"
+            exec "$training_python" "$project_dir/tools/train_continuous.py" --hidden-goal --render "$@"
         fi
         exec "$training_python" "$project_dir/tools/plot_training.py" "$@"
         ;;
@@ -41,26 +48,51 @@ case "$mode" in
         echo "bash run.sh train --render-speed 1   Tampilan kecepatan normal"
         echo "bash run.sh train --no-render       Training tanpa jendela"
         echo "bash run.sh train --steps 100000"
-        echo "bash run.sh train --algorithm naf   Training Continuous Deep Q-Learning"
+        echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal"
+        echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
-        echo "bash run.sh train --algorithm rl    Fine-tune SAC + monitor reward, Q critic, dan loss live"
-        echo "bash run.sh train --algorithm rl --timeout 180 --render-speed 1"
-        echo "bash run.sh train --algorithm rl --episodes 1000 --no-render"
+        echo "bash run.sh sim --fast              Percepat simulasi Webots"
+        echo "bash run.sh sim --policy path.json  Jalankan actor tertentu"
+        echo "bash run.sh train --algorithm rl --timeout 180 --render-speed 16"
         echo "bash run.sh graphs           Buat grafik dari latihan tersimpan"
         echo "bash run.sh graphs --report-dir /path/ke/run"
         exit 0
         ;;
     sim)
-        if [[ $# -gt 0 ]]; then shift; fi
-        if [[ "${1:-}" == "--algorithm" ]]; then
-            case "${2:-}" in
-                naf|sac|rl|rl_unguided|q_learning|astar) export MICROMOUSE_ALGORITHM="$2"; shift 2 ;;
-                *)
-                    echo "Pilih algoritma simulasi: naf, sac, rl, rl_unguided, q_learning, atau astar." >&2
-                    exit 2
+        shift
+        webots_mode=realtime
+        webots_args=()
+        export MICROMOUSE_ALGORITHM=hidden_goal
+        while (($#)); do
+            case "$1" in
+                --fast) webots_mode=fast; shift ;;
+                --realtime) webots_mode=realtime; shift ;;
+                --algorithm)
+                    case "${2:-}" in
+                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|astar)
+                            if [[ "$2" == "rl" ]]; then
+                                export MICROMOUSE_ALGORITHM=hidden_goal
+                            else
+                                export MICROMOUSE_ALGORITHM="$2"
+                            fi
+                            shift 2
+                            ;;
+                        *) echo "Pilih algoritma simulasi: hidden_goal (atau rl), naf, sac, rl_unguided, q_learning, atau astar." >&2; exit 2 ;;
+                    esac
                     ;;
+                --policy)
+                    if [[ -z "${2:-}" ]]; then echo "--policy memerlukan path actor JSON." >&2; exit 2; fi
+                    if [[ "$2" == /* ]]; then
+                        export MICROMOUSE_POLICY="$2"
+                    else
+                        export MICROMOUSE_POLICY="$PWD/$2"
+                    fi
+                    shift 2
+                    ;;
+                *) webots_args+=("$1"); shift ;;
             esac
-        fi
+        done
+        set -- "${webots_args[@]}"
         ;;
 esac
 
@@ -82,4 +114,4 @@ if ! "$base_python" -c 'import numpy; import cv2'; then
     exit 1
 fi
 
-exec webots --mode=realtime "$@" "$project_dir/worlds/world.wbt"
+exec webots --mode="$webots_mode" "$@" "$project_dir/worlds/world.wbt"

@@ -16,7 +16,7 @@ class ContinuousDriveEnv(gym.Env):
         self.training = training
         self.max_steps = max_steps or round(self.config.max_seconds/self.config.dt)
         self.action_space = gym.spaces.Box(-1.,1.,shape=(2,),dtype=np.float32)
-        self.observation_space = gym.spaces.Box(-1.,1.,shape=(26,),dtype=np.float32)
+        self.observation_space = gym.spaces.Box(-1.,1.,shape=(navigation.observation_size,),dtype=np.float32)
         self.curriculum = 1.
         self.mission_probability = 0.
         self.pose = np.zeros(3)
@@ -30,6 +30,9 @@ class ContinuousDriveEnv(gym.Env):
         self.step_callback = None
         self.teacher_actor = None
         self.teacher_anchor_weight = 0.
+        self.last_action = np.zeros(2, dtype=np.float32)
+        self.last_ir = np.ones(5, dtype=np.float32)
+        self.last_yellow = False
 
     def sample_near_goal(self, radius, *, visible=False):
         for _ in range(1000):
@@ -42,6 +45,8 @@ class ContinuousDriveEnv(gym.Env):
         raise RuntimeError('No safe curriculum start sampled near the goal')
 
     def goal_distance(self):
+        if self.nav.hidden_goal:
+            raise RuntimeError('Hidden-goal agents cannot read goal distance')
         if self.nav.guided:
             return self.nav.guidance(self.pose[:2])[1]
         return float(np.linalg.norm(self.pose[:2]-self.nav.goal))
@@ -51,7 +56,10 @@ class ContinuousDriveEnv(gym.Env):
         options = options or {}
         position = self.nav.start.copy()
         heading = float(options.get('heading',0.))
-        if not self.nav.guided:
+        if self.nav.hidden_goal:
+            # Every episode begins at the mission start; no target-based curriculum.
+            pass
+        elif not self.nav.guided:
             if options.get('local'):
                 position = self.sample_near_goal(.65, visible=True)
                 heading = self.np_random.uniform(-math.pi, math.pi)
@@ -68,7 +76,8 @@ class ContinuousDriveEnv(gym.Env):
         if 'position' in options:
             position = np.array(options['position'],dtype=float)
         for _ in range(30):
-            jitter = self.np_random.uniform(-.025,.025,2) if (self.training or options.get('jitter')) else np.zeros(2)
+            randomize = (self.training and not self.nav.hidden_goal) or options.get('jitter')
+            jitter = self.np_random.uniform(-.025,.025,2) if randomize else np.zeros(2)
             if self.nav.free(position+jitter,position+jitter):
                 position += jitter; break
         else: raise ValueError('Unsafe reset')
@@ -79,12 +88,17 @@ class ContinuousDriveEnv(gym.Env):
         self.episode_index += 1
         self.episode_return = 0.
         self.last_success = self.last_collision = False
-        self.potential = self.goal_distance()
-        return self.nav.observation(self.pose,self.wheels),{}
+        self.last_action[:] = 0
+        self.last_ir = self.nav.ir_ranges(self.pose) if self.nav.hidden_goal else np.ones(5, dtype=np.float32)
+        self.last_yellow = self.nav.yellow_detected(self.pose) if self.nav.hidden_goal else False
+        self.potential = 0. if self.nav.hidden_goal else self.goal_distance()
+        return self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
+                                    yellow_detected=self.last_yellow),{}
 
     def step(self, action):
         if self.finished: raise RuntimeError('Reset after termination or truncation')
         action = np.clip(np.asarray(action,dtype=float),-1.,1.)
+        self.last_action = action.astype(np.float32)
         teacher_action = None
         if self.teacher_actor is not None and self.teacher_anchor_weight:
             observation = self.nav.observation(self.pose,self.wheels)
@@ -100,17 +114,31 @@ class ContinuousDriveEnv(gym.Env):
                 collision = True; self.wheels[:] = 0; break
             self.pose = candidate
             if self.step_callback is not None and substep < 3:
+                if self.nav.hidden_goal:
+                    self.last_ir = self.nav.ir_ranges(self.pose)
+                    self.last_yellow = self.nav.yellow_detected(self.pose)
                 self.step_callback(self, dt=motor_dt)
         self.steps += 1
-        potential = self.goal_distance()
-        success = np.linalg.norm(self.pose[:2]-self.nav.goal) <= self.config.goal_tolerance
-        # Progress shapes exploration; elapsed time makes slower traversal costly.
-        reward = 12.*(self.potential-potential)-self.config.dt
+        if self.nav.hidden_goal:
+            self.last_ir = self.nav.ir_ranges(self.pose)
+            self.last_yellow = self.nav.yellow_detected(self.pose)
+            success = bool(self.last_yellow)
+            potential = 0.
+            # The yellow sensor is the only source of goal reward. A small
+            # time and near-wall cost improves efficiency without target hints.
+            reward = -.01
+            nearest_wall_m = float(np.min(self.last_ir))*.4
+            reward -= .02*max(0., (.12-nearest_wall_m)/.12)
+        else:
+            potential = self.goal_distance()
+            success = np.linalg.norm(self.pose[:2]-self.nav.goal) <= self.config.goal_tolerance
+            # Progress shapes exploration in the legacy explicitly selected modes.
+            reward = 12.*(self.potential-potential)-self.config.dt
         reward -= .003*float(np.square((self.wheels-previous)/self.config.wheel_limit).sum())
         if teacher_action is not None:
             reward -= self.teacher_anchor_weight*float(np.square(action-teacher_action).sum())
-        if collision: reward -= 15.
-        if success: reward += 30.
+        if collision: reward -= 25. if self.nav.hidden_goal else 15.
+        if success: reward += 200. if self.nav.hidden_goal else 30.
         self.episode_return += reward
         self.last_success, self.last_collision = bool(success), collision
         self.potential = potential
@@ -119,6 +147,10 @@ class ContinuousDriveEnv(gym.Env):
         self.finished = terminated or truncated
         if self.step_callback is not None:
             self.step_callback(self, force=self.finished, dt=motor_dt)
-        return self.nav.observation(self.pose,self.wheels),float(reward),terminated,truncated,dict(
-            is_success=bool(success),collision=collision,time_s=self.steps*self.config.dt,
-            goal_error_m=float(np.linalg.norm(self.pose[:2]-self.nav.goal)))
+        observation = self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
+                                          yellow_detected=self.last_yellow)
+        info = dict(is_success=bool(success),collision=collision,time_s=self.steps*self.config.dt,
+                    yellow_detected=bool(self.last_yellow),last_action=self.last_action.tolist())
+        if not self.nav.hidden_goal:
+            info['goal_error_m'] = float(np.linalg.norm(self.pose[:2]-self.nav.goal))
+        return observation,float(reward),terminated,truncated,info

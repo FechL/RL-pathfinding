@@ -6,6 +6,7 @@ archive
 models/*.zip
 models/*.pkl
 reports/continuous/runs/
+reports/continuous_hidden_goal/runs/
 reports/naf/runs/
 reports/naf/models/
 reports/rl/runs/

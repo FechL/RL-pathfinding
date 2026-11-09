@@ -89,6 +89,12 @@ def read_training_metrics(path):
             if steps < 0:
                 raise ValueError(f'Training metric steps cannot be negative: {raw}')
             row = {'timesteps': steps}
+            row['phase'] = raw.get('phase', '')
+            target_entropy = raw.get('target_entropy', '')
+            try:
+                row['target_entropy'] = None if target_entropy in ('', None) else float(target_entropy)
+            except ValueError as error:
+                raise ValueError(f'Malformed target entropy: {raw}') from error
             for key in ('q_value_mean', 'actor_loss', 'critic_loss', 'entropy_coefficient'):
                 value = raw.get(key, '')
                 if value in ('', None):
@@ -101,6 +107,32 @@ def read_training_metrics(path):
                     if not math.isfinite(parsed):
                         raise ValueError(f'Training metric {key} must be finite: {raw}')
                     row[key] = parsed
+            rows.append(row)
+    return rows
+
+
+def read_state_space(path):
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows = []
+    with path.open(newline='') as file:
+        for raw in csv.DictReader(file):
+            try:
+                row = {key: float(raw[key]) for key in (
+                    'timesteps', 'episode', 'x_m', 'y_m', 'heading_rad',
+                    'ir_front_left_m', 'ir_front_right_m', 'ir_left_m',
+                    'ir_rear_m', 'ir_right_m', 'action_forward_m_s',
+                    'action_yaw_rate_rad_s')}
+                row['yellow_detected'] = raw.get('yellow_detected', '').lower() in ('true', '1')
+                row['phase'] = raw.get('phase', '')
+                state = [float(value) for value in json.loads(raw.get('state_vector', '[]'))]
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+                # A live writer may be midway through its final CSV row.
+                continue
+            if len(state) != 12 or not np.all(np.isfinite(state)) or not all(math.isfinite(v) for v in row.values() if isinstance(v, float)):
+                continue
+            row['state_vector'] = state
             rows.append(row)
     return rows
 
@@ -140,13 +172,16 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
     episodes = read_monitor(report/'training.monitor.csv')
     checkpoints = read_checkpoints(report/'checkpoints.json')
     training_metrics = read_training_metrics(report/'training_metrics.csv')
-    if not episodes and not checkpoints and not training_metrics:
+    state_rows = read_state_space(report/'state_space.csv')
+    if not episodes and not checkpoints and not training_metrics and not state_rows:
         raise NoTrainingData(f'No training or evaluation data in {report}')
     manifest_path = report/'run.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     algorithm_key = str(manifest.get('algorithm', '')).lower()
     if algorithm_key == 'naf':
         algorithm = 'NAF'
+    elif algorithm_key == 'hidden_goal':
+        algorithm = 'SAC continuous dengan sensor kuning'
     elif manifest.get('route_guidance', True):
         algorithm = 'SAC dengan panduan rute'
     else:
@@ -229,6 +264,20 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
     fig.text(.08,.041,'Sumber: training.monitor.csv dan checkpoints.json pada folder laporan yang dipilih.',fontsize=9,color=GRAY)
     overview = output/'training_progress.png'
     _save(fig,overview)
+    if episodes:
+        step_fig, step_ax = plt.subplots(figsize=(9, 4.6), layout='constrained')
+        episode_index = np.arange(1, len(episodes)+1)
+        step_values = [row['steps'] for row in episodes]
+        step_ax.plot(episode_index, step_values, color=BLUE, alpha=.28, lw=.9, label='Per episode')
+        step_ax.plot(episode_index, rolling(step_values, window), color=BLUE, lw=2,
+                     label=f'Rata-rata hingga {window} episode terakhir')
+        step_ax.set(title='Jumlah langkah per episode', xlabel='Episode', ylabel='Langkah lingkungan')
+        step_ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=7))
+        step_ax.spines[['top', 'right']].set_visible(False)
+        step_ax.grid(axis='y', color='#e1e5e9')
+        step_ax.legend(frameon=False)
+        _save(step_fig, output/'episode_steps.png')
+        plt.close(step_fig)
     # Export a larger evaluation panel for reading small time differences.
     eval_fig = plt.figure(figsize=(9,5))
     eval_ax = eval_fig.add_subplot()
@@ -286,19 +335,63 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
                 ax.plot(xs, ys, 'o-', color=color, lw=1.6, ms=3)
             else:
                 ax.text(.5, .5, 'Belum tersedia', ha='center', va='center', transform=ax.transAxes)
+            exploitation = next((row['timesteps'] for row in training_metrics
+                                 if row.get('phase') == 'eksploitasi'), None)
+            if exploitation is not None:
+                ax.axvline(exploitation, color='#7959a3', ls='--', lw=1)
+                ax.text(exploitation, .96, 'Eksploitasi', rotation=90, va='top', ha='right',
+                        transform=ax.get_xaxis_transform(), fontsize=8, color='#7959a3')
         q_fig.text(.08, .035, 'Estimasi Q dihitung pada sampel replay; ini critic SAC, bukan Q-table tabular.',
                    fontsize=9, color=GRAY)
         _save(q_fig, output/'q_learning.png')
         plt.close(q_fig)
-    curriculum_note = ('Training memakai start misi tetap.' if manifest.get('mission_only') else
+    if state_rows:
+        state_fig, state_axes = plt.subplots(1, 3, figsize=(17, 5.2))
+        state_fig.suptitle('State dan aksi kontinu selama training SAC',
+                           x=.06, y=.98, ha='left', fontsize=18, fontweight='bold')
+        state_fig.subplots_adjust(left=.06, right=.96, bottom=.16, top=.84, wspace=.35)
+        steps = np.array([row['timesteps'] for row in state_rows])
+        x = np.array([row['x_m'] for row in state_rows])
+        y = np.array([row['y_m'] for row in state_rows])
+        scatter = state_axes[0].scatter(x, y, c=steps, cmap='viridis', s=8, alpha=.65)
+        for row in state_rows:
+            if row['yellow_detected']:
+                state_axes[0].scatter(row['x_m'], row['y_m'], marker='*', s=70,
+                                      color='#e6ad00', edgecolors='#714f00', zorder=4)
+        state_axes[0].set(title='State space posisi (proyeksi x/y)', xlabel='x (m)', ylabel='y (m)', aspect='equal')
+        state_fig.colorbar(scatter, ax=state_axes[0], label='Langkah training')
+        ir_specs = (
+            ('ir_front_left_m', 'IR depan kiri'), ('ir_front_right_m', 'IR depan kanan'),
+            ('ir_left_m', 'IR kiri'), ('ir_rear_m', 'IR belakang'), ('ir_right_m', 'IR kanan'))
+        for key, label in ir_specs:
+            state_axes[1].plot(steps, [row[key] for row in state_rows], lw=.8, label=label)
+        state_axes[1].set(title='State sensor jarak', xlabel='Langkah training', ylabel='Jarak IR (m)', ylim=(0, .42))
+        state_axes[1].legend(fontsize=8, frameon=False)
+        state_axes[2].plot(steps, [row['action_forward_m_s'] for row in state_rows],
+                           color=BLUE, lw=1, label='Kecepatan maju (m/s)')
+        yaw_ax = state_axes[2].twinx()
+        yaw_ax.plot(steps, [row['action_yaw_rate_rad_s'] for row in state_rows],
+                    color=ORANGE, lw=1, alpha=.8, label='Yaw rate (rad/s)')
+        state_axes[2].set(title='Aksi kontinu', xlabel='Langkah training', ylabel='Kecepatan maju (m/s)')
+        yaw_ax.set_ylabel('Yaw rate (rad/s)')
+        state_axes[2].legend([*state_axes[2].lines, *yaw_ax.lines],
+                             [line.get_label() for line in [*state_axes[2].lines, *yaw_ax.lines]],
+                             fontsize=8, frameon=False, loc='upper right')
+        for ax in (state_axes[0], state_axes[1], state_axes[2], yaw_ax):
+            ax.spines['top'].set_visible(False)
+            ax.grid(axis='both', alpha=.25)
+        _save(state_fig, output/'state_space.png')
+        plt.close(state_fig)
+    curriculum_note = ('Training memakai start misi tetap.' if manifest.get('mission_only') or manifest.get('hidden_goal_sensor') else
                        'Training curriculum changes; checkpoint evaluations use mission starts.')
     metadata = dict(completed_episodes=len(episodes),completed_episode_steps=sum(r['steps'] for r in episodes),
                     checkpoint_evaluations=len(checkpoints),rolling_window=window,control_dt_s=dt,
                     training_metric_rows=len(training_metrics),
+                    state_space_samples=len(state_rows),
                     episode_success_recorded=bool(episodes) and all('is_success' in r for r in episodes),
                     mission_only=bool(manifest.get('mission_only',False)),
                     sources=[str(report/'training.monitor.csv'),str(report/'checkpoints.json'),
-                             str(report/'training_metrics.csv')],
+                             str(report/'training_metrics.csv'),str(report/'state_space.csv')],
                     notes=['Short failed episodes are not faster solves.',
                            'Duplicate final checkpoint omitted only if values match.',
                            'Unknown historic success/collision data are not inferred from rewards.',
@@ -311,12 +404,16 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--report-dir',type=Path,default=ROOT/'reports/continuous')
+    parser.add_argument('--report-dir',type=Path,help='Training run folder; defaults to newest hidden-goal run')
     parser.add_argument('--output-dir',type=Path)
     parser.add_argument('--window',type=int,default=20)
     parser.add_argument('--watch',action='store_true',help='Regenerate PNGs while training writes new data')
     parser.add_argument('--interval',type=float,default=5.)
     args=parser.parse_args()
+    if args.report_dir is None:
+        runs=ROOT/'reports/continuous_hidden_goal/runs'
+        candidates=sorted((path for path in runs.glob('*/run.json')),key=lambda path:path.stat().st_mtime)
+        args.report_dir=candidates[-1].parent if candidates else ROOT/'reports/continuous'
     if args.window<1 or args.interval<=0:parser.error('window and interval must be positive')
     try:
         while True:

@@ -106,7 +106,7 @@ def floor_texture():
 
     draw.rectangle(cell_box(LAYOUT["start_cell"]), fill="#bfe0d2")
     for goal_cell in LAYOUT["goal_cells"]:
-        draw.rectangle(cell_box(goal_cell), fill="#f1d28e")
+        draw.rectangle(cell_box(goal_cell), fill="#ffe600")
 
     for i in range(width+1):
         x = i*cell*scale
@@ -115,14 +115,10 @@ def floor_texture():
         y = j*cell*scale
         draw.line((0, y, world_w*scale, y), fill="#c8d1cc", width=2)
 
-    regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     label_font = ImageFont.truetype(bold, 22)
-    small_font = ImageFont.truetype(regular, 15)
     sx, sy = cell_center(LAYOUT["start_cell"])
-    gx, gy = mission_points()[1]
     draw.text(xy(sx, sy), "START", fill="#245f52", font=label_font, anchor="mm")
-    draw.text(xy(gx, gy), "GOAL", fill="#80571c", font=label_font, anchor="mm")
     ImageDraw.Draw(image).rectangle((2, 2, image.width-3, image.height-3), outline="#748681", width=5)
 
     folder = ROOT / "worlds/textures"
@@ -145,7 +141,7 @@ EXTERNPROTO "../protos/Micromouse.proto"
 WorldInfo {{
   basicTimeStep 16
   title "{LAYOUT['title']}"
-  info [ "{width} x {height} cell maze with dead ends, loops, and a 2 x 2 goal at the far end." "Micromouse uses a trained Q-learning option policy with continuous differential-drive wheel control." ]
+  info [ "{width} x {height} cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses continuous SAC actions, infrared sensors, and a yellow color camera." ]
 }}
 DEF OVERVIEW Viewpoint {{
   orientation -0.29 0.54 0.79 1.27
@@ -184,7 +180,7 @@ DEF GOAL Pose {{ translation {goal[0]:.4f} {goal[1]:.4f} 0 }}
 DEF GOAL_MARKER Pose {{
   translation {goal[0]:.4f} {goal[1]:.4f} 0.001
   children [ Shape {{
-    appearance PBRAppearance {{ baseColor 0.92 0.66 0.23 transparency 0.25 roughness 1 }}
+    appearance PBRAppearance {{ baseColor 1 0.90 0.0 roughness 0.95 }}
     geometry Box {{ size {goal_size:.3f} {goal_size:.3f} 0.001 }}
   }} ]
 }}

@@ -30,6 +30,7 @@ class TrainingView:
         self.collision_rate = None
         self.latest_metrics = {}
         self.reward_history = deque(maxlen=120)
+        self.steps_history = deque(maxlen=120)
         self.success_history = deque(maxlen=120)
         self.collision_history = deque(maxlen=120)
         self.q_history = deque(maxlen=120)
@@ -54,13 +55,21 @@ class TrainingView:
             cv2.rectangle(frame, self.pixel(p + [-half[0], half[1]]), self.pixel(p + [half[0], -half[1]]),
                           (85, 95, 105), -1)
         cv2.circle(frame, self.pixel(self.nav.start), 7, (60, 150, 65), 2)
-        cv2.circle(frame, self.pixel(self.nav.goal), 9, (35, 145, 230), -1)
+        if self.nav.hidden_goal:
+            for x, y in self.nav.goal_cells:
+                center = self.nav.maze.center(y*self.nav.maze.width+x)
+                half = self.nav.cell_size/2
+                cv2.rectangle(frame, self.pixel(center+[-half, half]),
+                              self.pixel(center+[half, -half]), (25, 220, 255), -1)
+        else:
+            cv2.circle(frame, self.pixel(self.nav.goal), 9, (35, 145, 230), -1)
         cv2.line(frame, (self.size, 0), (self.size, self.size + self.header), (205, 210, 215), 1)
         return frame
 
-    def record_episode(self, reward, success, collision):
+    def record_episode(self, reward, success, collision, steps=0):
         self.completed_episodes += 1
         self.reward_history.append(float(reward))
+        self.steps_history.append(int(steps))
         self.success_history.append(bool(success))
         self.collision_history.append(bool(collision))
         recent_successes = list(self.success_history)[-100:]
@@ -151,30 +160,49 @@ class TrainingView:
             f"Actor loss {metric('train/actor_loss')} | Critic loss {metric('train/critic_loss')}",
         ]
         for i, line in enumerate(lines):
-            cv2.putText(frame, line, (x, 49 + i * 20), cv2.FONT_HERSHEY_SIMPLEX, .37,
+            cv2.putText(frame, line, (x, 43 + i * 18), cv2.FONT_HERSHEY_SIMPLEX, .34,
                         (65, 70, 75), 1, cv2.LINE_AA)
+
+        if self.nav.hidden_goal:
+            ir = ','.join(f'{value:.2f}' for value in env.last_ir)
+            action_v = (float(env.last_action[0])+1)*.5*env.config.max_linear
+            action_w = float(env.last_action[1])*env.config.max_angular
+            state_lines = [
+                f"State x/y/heading: {env.pose[0]:.2f} m, {env.pose[1]:.2f} m, {env.pose[2]:.2f} rad",
+                f"IR [FL,FR,L,B,R] / 0.4 m: [{ir}] | yellow={int(env.last_yellow)}",
+                f"Wheel rad/s: [{env.wheels[0]:.2f},{env.wheels[1]:.2f}] | aksi v={action_v:.2f} m/s, yaw={action_w:.2f} rad/s",
+                'State kontinu 12D: wheel 2 + IR 5 + GPS 2 + heading 2 + kamera 1',
+            ]
+            for i, line in enumerate(state_lines):
+                cv2.putText(frame, line, (x, 128+i*17), cv2.FONT_HERSHEY_SIMPLEX, .32,
+                            (40, 80, 120), 1, cv2.LINE_AA)
 
         gap = 12
         chart_width = (self.panel_width - 3 * gap) // 2
-        chart_height = 300
+        chart_height = 185
         chart_x1 = x
         chart_x2 = x + chart_width + gap
-        chart_y1 = self.header + 112
+        chart_y1 = self.header + 145
         chart_y2 = chart_y1 + chart_height + gap
+        chart_y3 = chart_y2 + chart_height + gap
         self.draw_chart(frame, (chart_x1, chart_y1, chart_width, chart_height),
                         'Reward episode', [('reward', (190, 105, 30), self.reward_history)])
         self.draw_chart(frame, (chart_x2, chart_y1, chart_width, chart_height),
+                        'Langkah per episode', [('steps', (65, 125, 185), self.steps_history)])
+        self.draw_chart(frame, (chart_x1, chart_y2, chart_width, chart_height),
                         'Hasil episode (%)', [
                             ('goal', (65, 155, 75), self._rolling_success()),
                             ('tabrakan', (50, 80, 220), self._rolling_collision()),
                         ], fixed_range=(0., 100.))
-        self.draw_chart(frame, (chart_x1, chart_y2, chart_width, chart_height),
-                        'Estimasi Q critic', [('Q mean', (190, 105, 30), self.q_history)])
         self.draw_chart(frame, (chart_x2, chart_y2, chart_width, chart_height),
+                        'Estimasi Q critic', [('Q mean', (190, 105, 30), self.q_history)])
+        self.draw_chart(frame, (chart_x1, chart_y3, chart_width, chart_height),
                         'Loss actor dan critic', [
                             ('actor', (65, 155, 75), self.actor_loss_history),
                             ('critic', (50, 80, 220), self.critic_loss_history),
                         ])
+        self.draw_chart(frame, (chart_x2, chart_y3, chart_width, chart_height),
+                        'Entropy SAC / eksplorasi', [('alpha', (121, 89, 163), self.entropy_history)])
         cv2.putText(frame, 'Q adalah estimasi critic SAC, bukan Q-table.', (x, self.size + self.header - 14),
                     cv2.FONT_HERSHEY_SIMPLEX, .36, (90, 95, 100), 1, cv2.LINE_AA)
 
@@ -214,9 +242,10 @@ class TrainingView:
             status = 'TABRAKAN'
         else:
             status = 'TIMEOUT' if env.finished else 'BERJALAN'
+        phase = 'eksplorasi' if self.nav.hidden_goal and 'Eksploitasi' not in self.stage else 'eksploitasi' if self.nav.hidden_goal else ''
         lines = [f'{self.stage} | Episode {env.episode_index} | {status}',
                  f'Step {env.steps} | Reward {env.episode_return:.1f} | Simulasi {env.steps * env.config.dt:.1f}/{env.max_steps * env.config.dt:.1f} dtk',
-                 f'Kecepatan tampilan {self.speed:g}x | Q / Esc / tutup jendela: akhiri training']
+                 f'Fase {phase or "continuous"} | speed {self.speed:g}x | Q / Esc: akhiri training']
         for i, line in enumerate(lines):
             cv2.putText(frame, line, (18, 26 + i * 28), cv2.FONT_HERSHEY_SIMPLEX, .48,
                         (40, 45, 50), 1, cv2.LINE_AA)
