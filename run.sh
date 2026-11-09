@@ -37,13 +37,13 @@ case "$mode" in
         ;;
     help|--help|-h)
         echo "bash run.sh                  Jalankan robot di Webots"
-        echo "bash run.sh train            Lihat robot saat training + grafik PNG lokal"
+        echo "bash run.sh train            Lihat robot, monitor SAC, dan grafik training live"
         echo "bash run.sh train --render-speed 1   Tampilan kecepatan normal"
         echo "bash run.sh train --no-render       Training tanpa jendela"
         echo "bash run.sh train --steps 100000"
         echo "bash run.sh train --algorithm naf   Training Continuous Deep Q-Learning"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
-        echo "bash run.sh train --algorithm rl    Fine-tune SAC dengan panduan koridor dari start asli"
+        echo "bash run.sh train --algorithm rl    Fine-tune SAC + monitor reward, Q critic, dan loss live"
         echo "bash run.sh train --algorithm rl --timeout 180 --render-speed 1"
         echo "bash run.sh train --algorithm rl --episodes 1000 --no-render"
         echo "bash run.sh graphs           Buat grafik dari latihan tersimpan"

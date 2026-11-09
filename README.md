@@ -39,6 +39,13 @@ episode logs and graphs. An explicit `--activate` installs a model for
 `bash run.sh sim --algorithm rl` only when it passes all three full-maze
 kinematic checks. The selected actor is saved as `models/rl_actor.json`.
 
+For `rl`, the live 2D window also shows episode reward, recent goal/collision
+rates, the SAC critics' sampled Q estimate, actor/critic loss, and entropy
+coefficient. The Q curve is a SAC critic estimate, not a tabular Q-learning
+table. Training writes `training_metrics.csv` and refreshes
+`figures/q_learning.png` at evaluation checkpoints. Headless runs keep the CSV
+and saved graphs without opening a window.
+
 `--episodes 1000` runs exactly 1,000 whole episodes, with a timeout on each.
 It evaluates the mission start every 100 episodes. A candidate replaces the
 best checkpoint only when all three fixed seeds reach the goal and its mean

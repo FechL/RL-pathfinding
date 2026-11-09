@@ -1,6 +1,7 @@
 """Train SAC with continuous v/yaw commands; export a numpy inference actor."""
 import argparse
 import copy
+import csv
 from collections import deque
 from datetime import datetime, timezone
 import json
@@ -128,7 +129,7 @@ def main():
         if not all(r['is_success'] for r in records):raise SystemExit('Continuous policy evaluation failed')
         return
     report=args.run_dir or report_root/'runs'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
-    if any((report/name).exists() for name in ('run.json','training.monitor.csv','checkpoints.json','summary.json')):
+    if any((report/name).exists() for name in ('run.json','training.monitor.csv','training_metrics.csv','checkpoints.json','summary.json')):
         parser.error('Run folder already contains training data. Choose a new --run-dir to preserve the previous run.')
     report.mkdir(parents=True,exist_ok=True)
     model_dir=report/'models';model_dir.mkdir(exist_ok=True)
@@ -153,7 +154,9 @@ def main():
         from training_view import TrainingView
         viewer=TrainingView(nav,args.render_speed)
         base.reset(seed=args.seed)
-        viewer.stage='Menyiapkan training' if args.warm_start else 'Training SAC tanpa rute' if not nav.guided else 'Training SAC'
+        viewer.stage=('Menyiapkan training' if args.warm_start else
+                      'Training RL (SAC)' if args.rl_mode else
+                      'Training SAC tanpa rute' if not nav.guided else 'Training SAC')
         viewer.update(base,force=True)
         base.step_callback=viewer.update
     env=Monitor(base,str(report/'training'),info_keywords=('is_success','collision','time_s','goal_error_m'))
@@ -205,6 +208,7 @@ def main():
         initial_entropy_coefficient=float(model.ent_coef_tensor.item()) if model.ent_coef_optimizer is None else float(model.log_ent_coef.exp().item()),
         requested_episodes=args.episodes,
         resumed_from=str(args.resume.resolve()) if args.resume else None,
+        training_metrics='training_metrics.csv',
         note='Separate run; runtime policy changes only with --activate.'),indent=2)+'\n')
     began=time.perf_counter()
     demonstrations=None
@@ -285,6 +289,66 @@ def main():
             self.episode_info=deque(maxlen=100)
             self.completed_episodes=0
             self.next_episode_evaluation=args.eval_every_episodes
+            self.training_metrics_file=None
+            self.training_metrics_writer=None
+            self.last_training_metrics={}
+            self.metrics_logger=None
+            self.original_logger_record=None
+            self.last_metrics_timestep=None
+
+        def _on_training_start(self):
+            self.training_metrics_file=(report/'training_metrics.csv').open('w',newline='')
+            self.training_metrics_writer=csv.DictWriter(
+                self.training_metrics_file,
+                fieldnames=('timesteps','q_value_mean','actor_loss','critic_loss','entropy_coefficient'))
+            self.training_metrics_writer.writeheader()
+
+            # Capture SAC's real training losses directly from its logger.
+            # The logger is configured by learn() before this callback runs.
+            self.metrics_logger=self.model.logger
+            self.original_logger_record=self.metrics_logger.record
+            def capture_metric(key,value,exclude=None):
+                result=self.original_logger_record(key,value,exclude)
+                if key in ('train/actor_loss','train/critic_loss','train/ent_coef'):
+                    try: scalar=float(value)
+                    except (TypeError,ValueError): return result
+                    self.last_training_metrics[key]=scalar
+                    if viewer: viewer.record_training_metric(key,scalar)
+                return result
+            self.metrics_logger.record=capture_metric
+
+        def _sample_q_value(self):
+            replay=self.model.replay_buffer
+            sample_size=min(128,replay.size()) if replay is not None else 0
+            if sample_size<1:return None
+            sample=replay.sample(sample_size,env=self.model._vec_normalize_env)
+            with torch.no_grad():
+                q_values=self.model.critic(sample.observations,sample.actions)
+                return float(torch.cat(q_values,dim=1).mean().item())
+
+        def _write_training_metrics(self):
+            q_value=self._sample_q_value()
+            if q_value is not None:
+                self.last_training_metrics['train/q_value_mean']=q_value
+                self.logger.record('train/q_value_mean',q_value)
+                if viewer:viewer.record_training_metric('train/q_value_mean',q_value)
+            self.training_metrics_writer.writerow(dict(
+                timesteps=self.model.num_timesteps,
+                q_value_mean=self.last_training_metrics.get('train/q_value_mean',''),
+                actor_loss=self.last_training_metrics.get('train/actor_loss',''),
+                critic_loss=self.last_training_metrics.get('train/critic_loss',''),
+                entropy_coefficient=self.last_training_metrics.get('train/ent_coef','')))
+            self.training_metrics_file.flush()
+            self.last_metrics_timestep=self.model.num_timesteps
+
+        def _on_training_end(self):
+            if (self.training_metrics_writer is not None and
+                    self.last_metrics_timestep!=self.model.num_timesteps):
+                self._write_training_metrics()
+            if self.metrics_logger is not None and self.original_logger_record is not None:
+                self.metrics_logger.record=self.original_logger_record
+            if self.training_metrics_file is not None:
+                self.training_metrics_file.close()
 
         def _on_step(self):
             if viewer:
@@ -297,13 +361,21 @@ def main():
                 if done:
                     self.episode_info.append(info)
                     self.completed_episodes+=1
+                    if viewer:
+                        episode=info.get('episode',{})
+                        viewer.record_episode(episode.get('r',base.episode_return),
+                                              info.get('is_success',False),info.get('collision',False))
+            if viewer:
+                viewer.set_progress(self.model.num_timesteps,self.completed_episodes)
             self.logger.record('curriculum/distance_fraction',base.curriculum)
             self.logger.record('curriculum/mission_start_probability',base.mission_probability)
             if self.episode_info:
                 self.logger.record('episodes/success_rate_100',sum(r['is_success'] for r in self.episode_info)/len(self.episode_info))
                 self.logger.record('episodes/collision_rate_100',sum(r['collision'] for r in self.episode_info)/len(self.episode_info))
                 self.logger.record('episodes/mean_duration_s_100',sum(r['time_s'] for r in self.episode_info)/len(self.episode_info))
-            if self.n_calls%1000==0:self.logger.dump(self.num_timesteps)
+            if self.n_calls%1000==0:
+                self._write_training_metrics()
+                self.logger.dump(self.num_timesteps)
             if self.n_calls%10000==0 and args.episodes is None:
                 print(f'SAC new steps={self.n_calls}/{args.steps}; elapsed={time.perf_counter()-began:.1f}s',flush=True)
                 self.model.save(model_dir/'sac_checkpoint')

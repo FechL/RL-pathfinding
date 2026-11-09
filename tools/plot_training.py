@@ -72,6 +72,39 @@ def read_checkpoints(path):
     return rows
 
 
+def read_training_metrics(path):
+    path = Path(path)
+    if not path.exists():
+        return []
+    rows = []
+    with path.open(newline='') as file:
+        reader = csv.DictReader(file)
+        for raw in reader:
+            try:
+                steps = int(raw['timesteps'])
+            except (ValueError, TypeError, KeyError) as error:
+                if raw.get('timesteps') in ('', None):
+                    continue
+                raise ValueError(f'Malformed training metric step: {raw}') from error
+            if steps < 0:
+                raise ValueError(f'Training metric steps cannot be negative: {raw}')
+            row = {'timesteps': steps}
+            for key in ('q_value_mean', 'actor_loss', 'critic_loss', 'entropy_coefficient'):
+                value = raw.get(key, '')
+                if value in ('', None):
+                    row[key] = None
+                else:
+                    try:
+                        parsed = float(value)
+                    except (ValueError, TypeError) as error:
+                        raise ValueError(f'Malformed training metric {key}: {raw}') from error
+                    if not math.isfinite(parsed):
+                        raise ValueError(f'Training metric {key} must be finite: {raw}')
+                    row[key] = parsed
+            rows.append(row)
+    return rows
+
+
 def rolling(values, window):
     values = np.asarray(values, dtype=float)
     sums = np.concatenate([[0.], np.cumsum(values)])
@@ -106,7 +139,8 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
     output = Path(output_dir) if output_dir else report/'figures'
     episodes = read_monitor(report/'training.monitor.csv')
     checkpoints = read_checkpoints(report/'checkpoints.json')
-    if not episodes and not checkpoints:
+    training_metrics = read_training_metrics(report/'training_metrics.csv')
+    if not episodes and not checkpoints and not training_metrics:
         raise NoTrainingData(f'No training or evaluation data in {report}')
     manifest_path = report/'run.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
@@ -228,13 +262,43 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         ax.legend(frameon=False)
         _save(outcomes, output/'episode_outcomes.png')
         plt.close(outcomes)
+    if training_metrics:
+        q_fig, q_axes = plt.subplots(2, 2, figsize=(12, 8))
+        q_fig.suptitle('Metrik SAC / RL: estimasi Q dan pembaruan actor-critic',
+                       x=.08, y=.98, ha='left', fontsize=17, fontweight='bold')
+        q_fig.subplots_adjust(left=.09, right=.97, bottom=.1, top=.9, wspace=.28, hspace=.35)
+        metric_specs = (
+            ('q_value_mean', 'Rata-rata estimasi Q critic', 'Nilai Q', BLUE),
+            ('critic_loss', 'Critic loss', 'MSE TD', ORANGE),
+            ('actor_loss', 'Actor loss', 'Loss', '#548b45'),
+            ('entropy_coefficient', 'Koefisien entropi SAC', 'Alpha', '#7959a3'),
+        )
+        metric_steps = [row['timesteps'] for row in training_metrics]
+        for ax, (key, title, ylabel, color) in zip(q_axes.flat, metric_specs):
+            values = [(step, row[key]) for step, row in zip(metric_steps, training_metrics) if row[key] is not None]
+            ax.spines[['top', 'right']].set_visible(False)
+            ax.grid(axis='y', color='#e1e5e9')
+            ax.set_axisbelow(True)
+            ax.set(title=title, xlabel='Langkah lingkungan terakumulasi', ylabel=ylabel)
+            ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x/1000:g}k'))
+            if values:
+                xs, ys = zip(*values)
+                ax.plot(xs, ys, 'o-', color=color, lw=1.6, ms=3)
+            else:
+                ax.text(.5, .5, 'Belum tersedia', ha='center', va='center', transform=ax.transAxes)
+        q_fig.text(.08, .035, 'Estimasi Q dihitung pada sampel replay; ini critic SAC, bukan Q-table tabular.',
+                   fontsize=9, color=GRAY)
+        _save(q_fig, output/'q_learning.png')
+        plt.close(q_fig)
     curriculum_note = ('Training memakai start misi tetap.' if manifest.get('mission_only') else
                        'Training curriculum changes; checkpoint evaluations use mission starts.')
     metadata = dict(completed_episodes=len(episodes),completed_episode_steps=sum(r['steps'] for r in episodes),
                     checkpoint_evaluations=len(checkpoints),rolling_window=window,control_dt_s=dt,
+                    training_metric_rows=len(training_metrics),
                     episode_success_recorded=bool(episodes) and all('is_success' in r for r in episodes),
                     mission_only=bool(manifest.get('mission_only',False)),
-                    sources=[str(report/'training.monitor.csv'),str(report/'checkpoints.json')],
+                    sources=[str(report/'training.monitor.csv'),str(report/'checkpoints.json'),
+                             str(report/'training_metrics.csv')],
                     notes=['Short failed episodes are not faster solves.',
                            'Duplicate final checkpoint omitted only if values match.',
                            'Unknown historic success/collision data are not inferred from rewards.',
