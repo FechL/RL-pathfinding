@@ -1,6 +1,6 @@
 #VRML_SIM R2025a utf8
 # template language: javascript
-# Small differential-drive micromouse with local IR and yellow-color sensors.
+# Small differential-drive micromouse with four infrared wall sensors and onboard localization.
 PROTO Micromouse [
   field SFVec3f    translation        0 0 0
   field SFRotation rotation           0 0 1 0
@@ -123,24 +123,6 @@ Robot {
       translation 0 -0.053 0.055
       rotation 0 0 1 -1.5708
       lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
-    }
-    DistanceSensor {
-      name "rear sensor"
-      type "infra-red"
-      translation -0.052 0 0.055
-      rotation 0 0 1 3.14159
-      lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
-    }
-    # Downward-facing camera over the robot's nose; the controller only
-    # classifies yellow floor pixels and never reads the goal's coordinates.
-    Camera {
-      name "yellow color sensor"
-      translation 0.055 0 0.024
-      width 32
-      height 32
-      fieldOfView 0.9
-      near 0.001
-      far 0.12
     }
     GPS { name "gps" }
     InertialUnit { name "imu" }
