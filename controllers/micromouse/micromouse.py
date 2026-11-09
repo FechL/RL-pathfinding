@@ -1,4 +1,4 @@
-"""Continuous NAF and SAC control, with legacy Q-learning and A* baselines."""
+"""Tabular Q-learning deployment with retained legacy comparison controllers."""
 import json
 import math
 import os
@@ -6,7 +6,6 @@ from pathlib import Path
 import sys
 import time
 
-from q_learning import policy_path
 from motion_metrics import motion_metrics
 
 from planner import (GRID_RESOLUTION, ROBOT_RADIUS, SAFETY_MARGIN, Obstacle,
@@ -151,10 +150,15 @@ def main():
     except ImportError as error:
         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
 
-    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "sac")
+    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
     if algorithm in ("naf", "sac", "rl", "rl_unguided"):
         from continuous_webots import run
         run(Supervisor(), algorithm)
+        return
+
+    if algorithm == "q_learning":
+        from tabular_webots import run
+        run(Supervisor())
         return
 
     supervisor = Supervisor()
@@ -188,15 +192,11 @@ def main():
         Path(capture).mkdir(parents=True, exist_ok=True)
     timer = time.perf_counter()
     policy_metadata = None
-    if algorithm == "q_learning":
-        policy_file = Path(os.environ.get("MICROMOUSE_POLICY", str(PROJECT / "models/q_learning.json")))
-        path, explored, policy_metadata = policy_path(start, goal, walls, bounds, cell_size, policy_file)
-        algorithm_label = "Q-Learning"
-    elif algorithm == "astar":
+    if algorithm == "astar":
         path, explored = plan_path(start, goal, walls, bounds)
         algorithm_label = "A*"
     else:
-        raise ValueError("MICROMOUSE_ALGORITHM must be naf, sac, rl, rl_unguided, q_learning or astar")
+        raise ValueError("MICROMOUSE_ALGORITHM must be q_learning, astar, naf, sac, rl or rl_unguided")
     planning_seconds = time.perf_counter()-timer
     print(f"Controller: {sys.executable}")
     print(f"Maze: {round((bounds[1]-bounds[0])/cell_size)} x {round((bounds[3]-bounds[2])/cell_size)} cells; walls: {len(walls)}; start: {start}; goal: {goal}")
