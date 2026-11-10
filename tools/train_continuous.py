@@ -96,8 +96,8 @@ def main():
     parser.add_argument('--no-route-guide',action='store_true',help='Learn with SAC using Euclidean goal progress and no Dijkstra or demonstrations')
     parser.add_argument('--rl-mode',action='store_true',help='Train a continuous RL policy for the selected route-guidance mode')
     parser.add_argument('--hidden-goal',action='store_true',
-                        help='Use continuous SAC with five IR ranges and a yellow camera flag; no goal coordinates or distance reward')
-    parser.add_argument('--exploration-fraction',type=float,default=.75,
+                        help='Use continuous SAC with four IR ranges and a yellow camera flag; no goal coordinates or distance reward')
+    parser.add_argument('--exploration-fraction',type=float,default=.60,
                         help='Fraction of training kept in high-entropy exploration before low-entropy exploitation')
     parser.add_argument('--exploration-entropy',type=float,default=.05,
                         help='Initial SAC entropy coefficient in the exploration stage')
@@ -161,7 +161,7 @@ def main():
     algorithm='hidden_goal' if args.hidden_goal else ('rl' if args.rl_mode and nav.guided else ('sac' if nav.guided else 'rl_unguided'))
     actor_name='hidden_goal_actor.json' if args.hidden_goal else 'continuous_actor.json' if algorithm=='sac' else 'rl_actor.json' if nav.guided else 'rl_unguided_actor.json'
     report_root=ROOT/'reports'/('continuous_hidden_goal' if args.hidden_goal else 'continuous' if algorithm=='sac' else 'rl_guided' if nav.guided else 'rl')
-    reward_description=('-0.01 per step - IR near-wall penalty - up to 0.04 anti-spin penalty per stalled step after 1.5 s, reduced near a wall - wheel slew penalty; +200 yellow camera; -25 collision; no goal-distance reward'
+    reward_description=('-0.015 per step + up to 0.01 movement reward +0.35 first-visit cell bonus - revisited-cell, near-wall, and low-speed-spin penalties; +200 yellow camera; -25 collision; no goal-distance reward'
                        if args.hidden_goal else
                        ('12 * geodesic progress' if nav.guided else '12 * Euclidean goal progress')+
                        ' - elapsed seconds - wheel slew penalty; +30 goal; -15 collision')
@@ -378,9 +378,10 @@ def main():
                 self.state_file=(report/'state_space.csv').open('w',newline='')
                 self.state_writer=csv.DictWriter(self.state_file,fieldnames=(
                     'timesteps','episode','phase','state_vector','x_m','y_m','heading_rad',
-                    'stagnation_fraction','anti_spin_penalty',
+                    'stagnation_fraction','cell_visit_fraction','novelty_reward',
+                    'revisit_cell_penalty','anti_spin_penalty',
                     'wheel_left_rad_s','wheel_right_rad_s','ir_front_left_m','ir_front_right_m',
-                    'ir_left_m','ir_rear_m','ir_right_m','yellow_detected',
+                    'ir_left_m','ir_right_m','yellow_detected',
                     'action_forward_m_s','action_yaw_rate_rad_s','episode_reward','collision','success'),
                     lineterminator='\n')
                 self.state_writer.writeheader()
@@ -473,29 +474,36 @@ def main():
                 if terminal_state is not None:
                     state_vector=np.asarray(terminal_state,dtype=np.float32).reshape(-1)
                     xmin,xmax,ymin,ymax=base.nav.bounds
-                    position=np.array([xmin+(state_vector[7]+1)*.5*(xmax-xmin),
-                                       ymin+(state_vector[8]+1)*.5*(ymax-ymin)])
-                    heading=math.atan2(float(state_vector[9]),float(state_vector[10]))
+                    position=np.array([xmin+(state_vector[6]+1)*.5*(xmax-xmin),
+                                       ymin+(state_vector[7]+1)*.5*(ymax-ymin)])
+                    heading=math.atan2(float(state_vector[8]),float(state_vector[9]))
                     state_wheels=state_vector[:2]*base.config.wheel_limit
-                    state_ir=state_vector[2:7]
-                    stagnation_fraction=float(state_vector[11])
+                    state_ir=state_vector[2:6]
+                    stagnation_fraction=float(state_vector[10])
+                    cell_visit_fraction=float(state_vector[11])
                     state_yellow=bool(state_vector[12])
                     action0,action1=map(float,terminal_info.get('last_action',(0.,0.)))
                     episode_reward=terminal_info.get('episode',{}).get('r',base.episode_return)
                     collision=terminal_info.get('collision',False)
                     success=terminal_info.get('is_success',False)
                     anti_spin_penalty=terminal_info.get('anti_spin_penalty',0.)
+                    novelty_reward=terminal_info.get('novelty_reward',0.)
+                    revisit_cell_penalty=terminal_info.get('revisit_cell_penalty',0.)
                     episode_index=max(1,base.episode_index-1)
                 else:
                     state_vector=base.nav.observation(base.pose,base.wheels,
                         ir_values=base.last_ir,yellow_detected=base.last_yellow,
-                        motion_stagnation=base.stagnation_fraction)
+                        motion_stagnation=base.stagnation_fraction,
+                        cell_visit_count=base.cell_visit_fraction)
                     position=base.pose[:2];heading=base.pose[2]
                     state_wheels=base.wheels
                     state_ir=base.last_ir
                     state_yellow=base.last_yellow
                     stagnation_fraction=base.stagnation_fraction
+                    cell_visit_fraction=base.cell_visit_fraction
                     anti_spin_penalty=base.anti_spin_penalty
+                    novelty_reward=base.novelty_reward
+                    revisit_cell_penalty=base.revisit_cell_penalty
                     action0,action1=map(float,base.last_action)
                     episode_reward=base.episode_return
                     collision=base.last_collision;success=base.last_success
@@ -505,10 +513,12 @@ def main():
                     episode=episode_index,phase=self.phase,
                     state_vector=json.dumps(state_vector.astype(float).tolist(),separators=(',',':')),
                     x_m=position[0],y_m=position[1],heading_rad=heading,
-                    stagnation_fraction=stagnation_fraction,anti_spin_penalty=anti_spin_penalty,
+                    stagnation_fraction=stagnation_fraction,cell_visit_fraction=cell_visit_fraction,
+                    novelty_reward=novelty_reward,revisit_cell_penalty=revisit_cell_penalty,
+                    anti_spin_penalty=anti_spin_penalty,
                     wheel_left_rad_s=state_wheels[0],wheel_right_rad_s=state_wheels[1],
                     ir_front_left_m=ranges[0],ir_front_right_m=ranges[1],ir_left_m=ranges[2],
-                    ir_rear_m=ranges[3],ir_right_m=ranges[4],yellow_detected=state_yellow,
+                    ir_right_m=ranges[3],yellow_detected=state_yellow,
                     action_forward_m_s=(action0+1)*.5*base.config.max_linear,
                     action_yaw_rate_rad_s=action1*base.config.max_angular,
                     episode_reward=episode_reward,collision=collision,success=success))

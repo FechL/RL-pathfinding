@@ -121,9 +121,10 @@ def read_state_space(path):
             try:
                 row = {key: float(raw[key]) for key in (
                     'timesteps', 'episode', 'x_m', 'y_m', 'heading_rad',
-                    'stagnation_fraction', 'anti_spin_penalty',
+                    'stagnation_fraction', 'cell_visit_fraction', 'novelty_reward',
+                    'revisit_cell_penalty', 'anti_spin_penalty',
                     'ir_front_left_m', 'ir_front_right_m', 'ir_left_m',
-                    'ir_rear_m', 'ir_right_m', 'action_forward_m_s',
+                    'ir_right_m', 'action_forward_m_s',
                     'action_yaw_rate_rad_s')}
                 row['yellow_detected'] = raw.get('yellow_detected', '').lower() in ('true', '1')
                 row['phase'] = raw.get('phase', '')
@@ -364,7 +365,7 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         state_fig.colorbar(scatter, ax=state_axes[0], label='Langkah training')
         ir_specs = (
             ('ir_front_left_m', 'IR depan kiri'), ('ir_front_right_m', 'IR depan kanan'),
-            ('ir_left_m', 'IR kiri'), ('ir_rear_m', 'IR belakang'), ('ir_right_m', 'IR kanan'))
+            ('ir_left_m', 'IR kiri'), ('ir_right_m', 'IR kanan'))
         for key, label in ir_specs:
             state_axes[1].plot(steps, [row[key] for row in state_rows], lw=.8, label=label)
         state_axes[1].set(title='State sensor jarak', xlabel='Langkah training', ylabel='Jarak IR (m)', ylim=(0, .42))
@@ -381,10 +382,14 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
                              fontsize=8, frameon=False, loc='upper right')
         state_axes[3].plot(steps, [row['stagnation_fraction'] for row in state_rows],
                            color='#548b45', lw=1, label='Diam/stagnasi')
-        state_axes[3].step(steps, [min(1., row['anti_spin_penalty']/.04) for row in state_rows],
+        state_axes[3].step(steps, [row['cell_visit_fraction'] for row in state_rows],
+                           where='post', color=BLUE, lw=1, label='Kunjungan sel')
+        state_axes[3].step(steps, [min(1., row['novelty_reward']/.35) for row in state_rows],
+                           where='post', color='#9a72ba', lw=1, label='Bonus sel baru')
+        state_axes[3].step(steps, [min(1., row['anti_spin_penalty']/.105) for row in state_rows],
                            where='post', color=ORANGE, lw=1, label='Penalti anti-spin')
-        state_axes[3].set(title='Diam atau berputar tanpa berpindah', xlabel='Langkah training',
-                          ylabel='Fraksi stagnasi / penalti aktif (0–1)')
+        state_axes[3].set(title='Eksplorasi dan anti-spin', xlabel='Langkah training',
+                          ylabel='Nilai ter-normalisasi (0–1)')
         state_axes[3].set_ylim(-.01, 1.05)
         state_axes[3].legend(fontsize=8, frameon=False)
         for ax in (*state_axes, yaw_ax):

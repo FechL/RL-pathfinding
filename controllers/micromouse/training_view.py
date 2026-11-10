@@ -164,14 +164,16 @@ class TrainingView:
                         (65, 70, 75), 1, cv2.LINE_AA)
 
         if self.nav.hidden_goal:
-            ir = ','.join(f'{value:.2f}' for value in env.last_ir)
+            ir = ' '.join(f'{label}:{value*.4:.2f}m'
+                          for label, value in zip(self.nav.ir_sensor_labels, env.last_ir))
             action_v = (float(env.last_action[0])+1)*.5*env.config.max_linear
             action_w = float(env.last_action[1])*env.config.max_angular
             state_lines = [
                 f"State x/y/heading: {env.pose[0]:.2f} m, {env.pose[1]:.2f} m, {env.pose[2]:.2f} rad",
-                f"IR [FL,FR,L,B,R] / 0.4 m: [{ir}] | yellow={int(env.last_yellow)}",
+                f"IR {ir} | hijau=kosong sampai 0.40m, kuning dekat, merah <0.10m",
                 f"Wheel rad/s: [{env.wheels[0]:.2f},{env.wheels[1]:.2f}] | aksi v={action_v:.2f} m/s, yaw={action_w:.2f} rad/s",
-                f"State 13D: wheel + IR + GPS + arah + stagnasi + kamera | diam {env.stagnation_fraction*1.5:.1f}s",
+                f"Sel baru +{env.novelty_reward:.2f} | ulang -{env.revisit_cell_penalty:.2f} | spin -{env.anti_spin_penalty:.2f}",
+                f"Kunjungan sel {env.cell_visit_fraction:.2f} | diam {env.stagnation_fraction*.5:.1f}s | kuning={int(env.last_yellow)}",
             ]
             for i, line in enumerate(state_lines):
                 cv2.putText(frame, line, (x, 128+i*17), cv2.FONT_HERSHEY_SIMPLEX, .32,
@@ -232,6 +234,15 @@ class TrainingView:
         self.trail.append(point)
         if len(self.trail) > 1:
             cv2.polylines(frame, [np.asarray(self.trail, dtype=np.int32)], False, (200, 150, 55), 2)
+        if self.nav.hidden_goal:
+            origins, directions, distances = self.nav.ir_ray_segments(env.pose)
+            for origin, direction, distance in zip(origins, directions, distances):
+                end = origin + direction * distance
+                start_px, end_px = self.pixel(origin), self.pixel(end)
+                color = (55, 175, 70) if distance >= .23 else (35, 180, 235) if distance >= .10 else (55, 65, 220)
+                cv2.line(frame, start_px, end_px, color, 2, cv2.LINE_AA)
+                cv2.circle(frame, start_px, 3, color, -1, cv2.LINE_AA)
+                cv2.circle(frame, end_px, 3, color, -1, cv2.LINE_AA)
         radius = max(4, round(.075 / (self.nav.bounds[1] - self.nav.bounds[0]) * (self.size - 2 * self.pad)))
         cv2.circle(frame, point, radius, (45, 75, 220), -1)
         nose = self.pixel(env.pose[:2] + .13 * np.array([math.cos(env.pose[2]), math.sin(env.pose[2])]))
@@ -244,7 +255,7 @@ class TrainingView:
             status = 'TIMEOUT' if env.finished else 'BERJALAN'
         phase = 'eksplorasi' if self.nav.hidden_goal and 'Eksploitasi' not in self.stage else 'eksploitasi' if self.nav.hidden_goal else ''
         lines = [f'{self.stage} | Episode {env.episode_index} | {status}',
-                 f'Step {env.steps} | Reward {env.episode_return:.1f} | Simulasi {env.steps * env.config.dt:.1f}/{env.max_steps * env.config.dt:.1f} dtk',
+                 f'Step {env.steps} | Reward akumulasi {env.episode_return:.1f} | Simulasi {env.steps * env.config.dt:.1f}/{env.max_steps * env.config.dt:.1f} dtk',
                  f'Fase {phase or "continuous"} | speed {self.speed:g}x | Q / Esc: akhiri training']
         for i, line in enumerate(lines):
             cv2.putText(frame, line, (18, 26 + i * 28), cv2.FONT_HERSHEY_SIMPLEX, .48,

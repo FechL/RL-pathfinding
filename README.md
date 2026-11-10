@@ -2,22 +2,24 @@
 
 The default learner uses **continuous Soft Actor-Critic (SAC)** in the fixed
 16 × 16 Webots maze. The actor outputs real-valued forward speed and yaw rate;
-it receives five continuous IR ranges, wheel speeds, continuous GPS position,
-heading, a continuous signal for prolonged lack of motion, and a one-bit
-yellow-camera reading. The policy and reward do not use
+it receives four continuous IR ranges (front-left, front-right, left, and
+right), wheel speeds, continuous GPS position, heading, stagnation and cell
+visit signals, and a one-bit yellow-camera reading. The policy and reward do not use
 the goal coordinates or goal distance. It succeeds when the camera detects
 the yellow floor tile. A collision ends the episode with a penalty; a separate
-180-second timeout prevents an episode from running forever. After 1.5 seconds
-without translation, the agent receives an anti-spin penalty and continuous
-stagnation signal. Nearby walls reduce that penalty so the robot can pivot in
-a dead end.
+180-second timeout prevents an episode from running forever. Per-step rewards
+are accumulated into the episode return; SAC also learns from discounted
+returns (`gamma=0.9995`). A first visit to a cell gives `+0.35`, revisiting
+costs up to `-0.05`, movement receives up to `+0.01` per step, and the agent
+pays `-0.015` per step plus a low-speed-spin penalty. Wall proximity
+reduces the spin penalty so the robot can turn in a dead end.
 
 ```bash
 bash run.sh train                         # training animation + live metrics
 bash run.sh train --algorithm rl          # same continuous hidden-goal SAC
 bash run.sh train --render-speed 16       # faster visible preview
 bash run.sh train --no-render             # fastest training, logs still saved
-bash run.sh train --steps 100000 --exploration-fraction 0.75
+bash run.sh train --steps 100000 --exploration-fraction 0.60
 bash run.sh sim                           # Webots robot run; hidden-goal actor
 bash run.sh sim --fast                    # Webots simulation speed mode
 bash run.sh graphs                        # graphs for the newest training run
@@ -26,8 +28,8 @@ bash run.sh graphs                        # graphs for the newest training run
 Training has two SAC phases. The first uses higher entropy for **exploration**;
 the second lowers target entropy for **exploitation**. Actions remain continuous
 in both phases. The live local window shows the robot moving from the mission
-start, its trajectory, continuous state values, all five IR readings, the
-yellow sensor bit, stagnation signal, reward, steps, success/collision rates, critic Q estimate,
+start, its trajectory, four colored IR rays with distance readings, the
+yellow sensor bit, stagnation and cell-visit signals, reward, steps, success/collision rates, critic Q estimate,
 actor/critic loss, and entropy. Q here is SAC's critic estimate, not a Q-table.
 There is no web service: `run.sh` starts the local simulator and monitor.
 
@@ -36,7 +38,7 @@ continuous state/action samples in `state_space.csv`, episode reward/steps and
 outcomes in `training.monitor.csv`, SAC metrics in `training_metrics.csv`, and
 plots including `figures/state_space.png`, `figures/episode_steps.png`, reward,
 success/collision, Q, losses, and entropy. State-space plots also show the
-anti-spin signal. The policy candidate is saved inside that run's
+sensor readings, exploration and anti-spin signals. The policy candidate is saved inside that run's
 `models/` folder. To try a candidate in Webots without replacing the default:
 
 ```bash

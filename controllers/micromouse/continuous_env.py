@@ -31,13 +31,18 @@ class ContinuousDriveEnv(gym.Env):
         self.teacher_actor = None
         self.teacher_anchor_weight = 0.
         self.last_action = np.zeros(2, dtype=np.float32)
-        self.last_ir = np.ones(5, dtype=np.float32)
+        self.last_ir = np.ones(4 if self.nav.hidden_goal else 5, dtype=np.float32)
         self.last_yellow = False
         self.last_position = np.zeros(2, dtype=float)
         self.stagnation_steps = 0
-        self.stagnation_limit = max(1, round(1.5/self.config.dt))
+        self.stagnation_limit = max(1, round(.5/self.config.dt))
         self.stagnation_fraction = 0.
         self.anti_spin_penalty = 0.
+        self.cell_visits = np.zeros((self.nav.maze.height, self.nav.maze.width), dtype=np.uint16)
+        self.current_cell = None
+        self.cell_visit_fraction = 0.
+        self.novelty_reward = 0.
+        self.revisit_cell_penalty = 0.
 
     def sample_near_goal(self, radius, *, visible=False):
         for _ in range(1000):
@@ -97,13 +102,24 @@ class ContinuousDriveEnv(gym.Env):
         self.last_ir = self.nav.ir_ranges(self.pose) if self.nav.hidden_goal else np.ones(5, dtype=np.float32)
         self.last_yellow = self.nav.yellow_detected(self.pose) if self.nav.hidden_goal else False
         self.last_position = self.pose[:2].copy()
+        self.cell_visits.fill(0)
+        self.current_cell = self.nav.maze.state(self.pose[:2]) if self.nav.hidden_goal else None
+        if self.current_cell is not None:
+            x, y = self.current_cell % self.nav.maze.width, self.current_cell // self.nav.maze.width
+            self.cell_visits[y, x] = 1
+            self.cell_visit_fraction = .25
+        else:
+            self.cell_visit_fraction = 0.
         self.stagnation_steps = 0
         self.stagnation_fraction = 0.
         self.anti_spin_penalty = 0.
+        self.novelty_reward = 0.
+        self.revisit_cell_penalty = 0.
         self.potential = 0. if self.nav.hidden_goal else self.goal_distance()
         return self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
                                     yellow_detected=self.last_yellow,
-                                    motion_stagnation=self.stagnation_fraction),{}
+                                    motion_stagnation=self.stagnation_fraction,
+                                    cell_visit_count=self.cell_visit_fraction),{}
 
     def step(self, action):
         if self.finished: raise RuntimeError('Reset after termination or truncation')
@@ -136,20 +152,41 @@ class ContinuousDriveEnv(gym.Env):
             potential = 0.
             moved = float(np.linalg.norm(self.pose[:2]-self.last_position))
             self.last_position = self.pose[:2].copy()
-            # Penalize prolonged turning/stopping. Nearby front walls reduce
-            # the penalty so a useful pivot in a dead end stays possible.
-            front_clearance_m = float(np.min(self.last_ir[:2]))*.4
-            if moved < .001:
+
+            # Reward newly explored cells; revisiting a cell carries a small
+            # cost. Neither signal depends on the hidden goal location.
+            cell = self.nav.maze.state(self.pose[:2])
+            self.novelty_reward = 0.
+            self.revisit_cell_penalty = 0.
+            if cell != self.current_cell:
+                x, y = cell % self.nav.maze.width, cell // self.nav.maze.width
+                previous_visits = int(self.cell_visits[y, x])
+                if previous_visits == 0:
+                    self.novelty_reward = .35
+                else:
+                    self.revisit_cell_penalty = min(.05, .015 * previous_visits)
+                self.cell_visits[y, x] = min(65535, previous_visits + 1)
+                self.current_cell = cell
+            x, y = cell % self.nav.maze.width, cell // self.nav.maze.width
+            self.cell_visit_fraction = min(1., float(self.cell_visits[y, x]) / 4.)
+
+            # Use both translation and action to catch tight circles that
+            # slipped through the old per-step displacement threshold.
+            nearby_wall_m = float(np.min(self.last_ir))*.4
+            if moved < .003:
                 self.stagnation_steps += 1
             else:
                 self.stagnation_steps = 0
             self.stagnation_fraction = min(1., self.stagnation_steps/self.stagnation_limit)
-            wall_discount = float(np.clip((front_clearance_m-.05)/.17, .15, 1.))
-            self.anti_spin_penalty = (.04*wall_discount
-                if self.stagnation_steps >= self.stagnation_limit else 0.)
-            # The yellow sensor is the only source of goal reward. A small
-            # time and near-wall cost improves efficiency without target hints.
-            reward = -.01
+            requested_speed = (float(action[0]) + 1.) * .5 * self.config.max_linear
+            low_speed_turn = abs(float(action[1])) * float(np.clip((.12-requested_speed)/.12, 0., 1.))
+            wall_discount = float(np.clip((nearby_wall_m-.05)/.17, .15, 1.))
+            self.anti_spin_penalty = (.025*low_speed_turn + .08*self.stagnation_fraction)*wall_discount
+
+            # Dense movement and novelty feedback help the agent learn before
+            # it first sees the yellow goal tile.
+            movement_reward = min(.01, .4*moved)
+            reward = -.015 + movement_reward + self.novelty_reward - self.revisit_cell_penalty
             nearest_wall_m = float(np.min(self.last_ir))*.4
             reward -= .02*max(0., (.12-nearest_wall_m)/.12)
             reward -= self.anti_spin_penalty
@@ -173,10 +210,14 @@ class ContinuousDriveEnv(gym.Env):
             self.step_callback(self, force=self.finished, dt=motor_dt)
         observation = self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
                                           yellow_detected=self.last_yellow,
-                                          motion_stagnation=self.stagnation_fraction)
+                                          motion_stagnation=self.stagnation_fraction,
+                                          cell_visit_count=self.cell_visit_fraction)
         info = dict(is_success=bool(success),collision=collision,time_s=self.steps*self.config.dt,
                     yellow_detected=bool(self.last_yellow),last_action=self.last_action.tolist(),
                     stagnation_fraction=float(self.stagnation_fraction),
+                    cell_visit_fraction=float(self.cell_visit_fraction),
+                    novelty_reward=float(self.novelty_reward),
+                    revisit_cell_penalty=float(self.revisit_cell_penalty),
                     anti_spin_penalty=float(self.anti_spin_penalty))
         if not self.nav.hidden_goal:
             info['goal_error_m'] = float(np.linalg.norm(self.pose[:2]-self.nav.goal))

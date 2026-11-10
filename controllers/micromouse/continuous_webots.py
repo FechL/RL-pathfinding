@@ -34,7 +34,7 @@ def read_hidden_scene(supervisor):
 
 
 def infrared_range_m(sensor):
-    """Invert the five-point IR lookup table into the same range as training."""
+    """Invert the four physical IR sensors' lookup table into metres."""
     raw = float(sensor.getValue())
     return float(np.interp(raw, [0, 450, 1500, 2800, 4095], [.4, .2, .1, .05, 0]))
 
@@ -100,7 +100,7 @@ def run(supervisor, algorithm):
     for motor,encoder in zip(motors,encoders):
         motor.setPosition(float('inf'));motor.setVelocity(0);encoder.enable(timestep)
     sensors={}
-    sensor_names=('front left sensor','front right sensor','left side sensor','rear sensor','right side sensor')
+    sensor_names=('front left sensor','front right sensor','left side sensor','right side sensor')
     for name in sensor_names:
         sensor=supervisor.getDevice(name);sensor.enable(timestep);sensors[name]=sensor
     camera=None
@@ -122,15 +122,19 @@ def run(supervisor, algorithm):
     commands=np.zeros(2);measured=np.zeros(2);previous_encoder=np.array([e.getValue() for e in encoders])
     steps=0;success=False;violation=None
     stagnation_steps=0
-    stagnation_limit=max(1,round(1.5/nav.config.dt))
+    stagnation_limit=max(1,round(.5/nav.config.dt))
     stagnation_fraction=0.
     last_policy_position=pose[:2].copy()
+    cell_visits=np.zeros((nav.maze.height,nav.maze.width),dtype=np.uint16)
+    current_cell=nav.maze.state(pose[:2])
+    cell_visits[current_cell//nav.maze.width,current_cell%nav.maze.width]=1
+    cell_visit_fraction=.25
     policy_ticks = 1 if nav.guided else round(nav.config.dt/dt)
     minimum_clearance = .005 if nav.guided else 0.
     clearance=physical_clearance(pose[:2],walls,bounds)
     best_progress=math.inf;last_progress=began
     inference_seconds=0.
-    guidance = ('five IR sensors and yellow camera flag; no goal coordinates' if hidden_goal else
+    guidance = ('four IR sensors and yellow camera flag; no goal coordinates' if hidden_goal else
                 'known-map local bearing' if nav.guided else 'goal and simulated local range observations')
     print(f'{label}: continuous forward velocity / yaw-rate policy; {guidance}',flush=True)
     while supervisor.step(timestep)!=-1:
@@ -161,15 +165,22 @@ def run(supervisor, algorithm):
             clipped_measured=np.clip(measured,-nav.config.wheel_limit,nav.config.wheel_limit)
             if hidden_goal:
                 ir=np.array([infrared_range_m(sensors[name])/.4 for name in sensor_names],dtype=np.float32)
+                cell=nav.maze.state(pose[:2])
+                if cell!=current_cell:
+                    current_cell=cell
+                    cell_visits[cell//nav.maze.width,cell%nav.maze.width]=min(
+                        65535,int(cell_visits[cell//nav.maze.width,cell%nav.maze.width])+1)
+                cell_visit_fraction=min(1.,float(cell_visits[cell//nav.maze.width,cell%nav.maze.width])/4.)
                 moved=float(np.linalg.norm(pose[:2]-last_policy_position))
-                if steps>0 and moved<.001:
+                if steps>0 and moved<.003:
                     stagnation_steps+=1
                 else:
                     stagnation_steps=0
                 stagnation_fraction=min(1.,stagnation_steps/stagnation_limit)
                 last_policy_position=pose[:2].copy()
                 observation=nav.observation(pose,clipped_measured,ir_values=ir,
-                    yellow_detected=yellow,motion_stagnation=stagnation_fraction)
+                    yellow_detected=yellow,motion_stagnation=stagnation_fraction,
+                    cell_visit_count=cell_visit_fraction)
             else:
                 observation=nav.observation(pose,clipped_measured)
             action=actor(observation)
@@ -178,10 +189,12 @@ def run(supervisor, algorithm):
         for motor,command in zip(motors,commands):motor.setVelocity(float(command))
         telemetry_row=dict(time_s=current_time-began,pose=pose.tolist(),action=action.tolist(),
                            commanded_wheels=commands.tolist(),measured_wheels=measured.tolist(),
-                           ir={name:s.getValue() for name,s in sensors.items()})
+                           ir_raw={name:s.getValue() for name,s in sensors.items()})
         if hidden_goal:
+            telemetry_row['ir_range_m']={name:float(value*.4) for name,value in zip(sensor_names,ir)}
             telemetry_row['yellow_detected']=yellow
             telemetry_row['stagnation_fraction']=stagnation_fraction
+            telemetry_row['cell_visit_fraction']=cell_visit_fraction
         telemetry.append(telemetry_row)
         steps+=1
         if show and steps%2==0:view.update(pose[:2],pose[2],trail)

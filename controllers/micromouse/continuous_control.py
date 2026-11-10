@@ -76,6 +76,10 @@ class NavigationMap:
     """
     ray_angles = np.linspace(-math.pi, math.pi, 16, endpoint=False)
     ray_range = .8
+    ir_sensor_labels = ('FL', 'FR', 'L', 'R')
+    ir_sensor_offsets = np.array([[.052, .026], [.052, -.026],
+                                  [0., .053], [0., -.053]])
+    ir_sensor_angles = np.array([-.20, .20, math.pi/2, -math.pi/2])
 
     def __init__(self, start, goal, walls, bounds, cell_size, config=None, *, guided=True,
                  hidden_goal=False, goal_cells=None):
@@ -192,16 +196,13 @@ class NavigationMap:
         hits = np.where((far>=near)&(far>=0),np.maximum(near,0),self.ray_range)
         return np.clip(hits.min(axis=1),0,self.ray_range)/self.ray_range
 
-    def ir_ranges(self, pose, maximum=.4):
-        """Continuous range readings for the five physical IR sensor poses."""
+    def ir_ray_segments(self, pose, maximum=.4):
+        """Return sensor origins, hit distances and ray directions in metres."""
         pose = np.asarray(pose, dtype=float)
-        offsets = np.array([[.052, .026], [.052, -.026], [0., .053],
-                            [-.052, 0.], [0., -.053]])
-        relative_angles = np.array([-.20, .20, math.pi/2, math.pi, -math.pi/2])
         c, s = math.cos(pose[2]), math.sin(pose[2])
         rotation = np.array([[c, -s], [s, c]])
-        origins = pose[:2] + offsets @ rotation.T
-        angles = pose[2] + relative_angles
+        origins = pose[:2] + self.ir_sensor_offsets @ rotation.T
+        angles = pose[2] + self.ir_sensor_angles
         directions = np.stack([np.cos(angles), np.sin(angles)], axis=1)
         centers, halves = self.local_geometry(pose[:2])
         xmin, xmax, ymin, ymax = self.bounds
@@ -216,7 +217,13 @@ class NavigationMap:
         near = np.minimum(first, last).max(axis=2)
         far = np.maximum(first, last).min(axis=2)
         hits = np.where((far >= near) & (far >= 0), np.maximum(near, 0), maximum)
-        return np.clip(hits.min(axis=1), 0, maximum) / maximum
+        distances = np.clip(hits.min(axis=1), 0, maximum)
+        return origins, directions, distances
+
+    def ir_ranges(self, pose, maximum=.4):
+        """Four continuous IR ranges: front-left, front-right, left, right."""
+        _, _, distances = self.ir_ray_segments(pose, maximum)
+        return distances / maximum
 
     def yellow_detected(self, pose):
         if not self.goal_cells:
@@ -229,16 +236,18 @@ class NavigationMap:
         return (ix, iy) in self.goal_cells
 
     def observation(self, pose, wheels, *, ir_values=None, yellow_detected=None,
-                    motion_stagnation=0.):
+                    motion_stagnation=0., cell_visit_count=0.):
         pose = np.asarray(pose)
         if self.hidden_goal:
             xmin, xmax, ymin, ymax = self.bounds
             xy = 2*(pose[:2]-[xmin, ymin])/np.array([xmax-xmin, ymax-ymin])-1
             ir = self.ir_ranges(pose) if ir_values is None else np.asarray(ir_values, dtype=float)
             yellow = self.yellow_detected(pose) if yellow_detected is None else bool(yellow_detected)
+            cell_visits = np.clip(cell_visit_count, 0., 1.)
             return np.concatenate([np.asarray(wheels)/self.config.wheel_limit, ir, xy,
                                    [math.sin(pose[2]), math.cos(pose[2]),
-                                    np.clip(motion_stagnation, 0., 1.), float(yellow)]])\
+                                    np.clip(motion_stagnation, 0., 1.),
+                                    cell_visits, float(yellow)]])\
                 .astype(np.float32)
         target = self.guidance(pose[:2])[0] if self.guided else self.goal
         delta = target-pose[:2]
@@ -254,15 +263,16 @@ class NavigationMap:
     def metadata(self):
         if self.hidden_goal:
             return dict(format_version=1, algorithm='hidden_goal', signature=self.signature,
-                        config=asdict(self.config), observation_version=5,
-                        observation=('continuous normalized wheel speeds, five continuous IR ranges, '
-                                     'continuous GPS x/y, sin/cos heading, continuous stagnation signal, '
-                                     'yellow camera flag'),
+                        config=asdict(self.config), observation_version=6,
+                        observation=('continuous normalized wheel speeds, four continuous IR ranges, '
+                                     'continuous GPS x/y, sin/cos heading, continuous stagnation and '
+                                     'cell-visit signals, yellow camera flag'),
                         observation_fields=('wheel_left_norm','wheel_right_norm',
                                             'ir_front_left_norm','ir_front_right_norm',
-                                            'ir_left_norm','ir_rear_norm','ir_right_norm',
+                                            'ir_left_norm','ir_right_norm',
                                             'x_norm','y_norm','heading_sin','heading_cos',
-                                            'stagnation_fraction','yellow_detected'),
+                                            'stagnation_fraction','cell_visit_fraction',
+                                            'yellow_detected'),
                         observation_size=self.observation_size,
                         action='two continuous normalized values: forward speed and yaw rate',
                         guidance='none; terminal success comes from the yellow color sensor',
