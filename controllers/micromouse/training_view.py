@@ -57,7 +57,7 @@ class TrainingView:
         cv2.circle(frame, self.pixel(self.nav.start), 7, (60, 150, 65), 2)
         if self.nav.hidden_goal:
             for x, y in self.nav.goal_cells:
-                center = self.nav.maze.center(y*self.nav.maze.width+x)
+                center = np.asarray(self.nav.maze.center(y*self.nav.maze.width+x))
                 half = self.nav.cell_size/2
                 cv2.rectangle(frame, self.pixel(center+[-half, half]),
                               self.pixel(center+[half, -half]), (25, 220, 255), -1)
