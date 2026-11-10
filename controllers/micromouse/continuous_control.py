@@ -94,7 +94,7 @@ class NavigationMap:
         self.wall_halves = np.array([w.size for w in walls], dtype=float).reshape(-1,2)/2
         if any(w.circular for w in walls):
             raise ValueError('Continuous navigation currently supports rectangular maze walls')
-        self.observation_size = 12 if self.hidden_goal else 26
+        self.observation_size = 13 if self.hidden_goal else 26
         if not guided:
             if not self.hidden_goal:
                 return
@@ -228,7 +228,8 @@ class NavigationMap:
         iy = math.floor((y - self.bounds[2]) / self.cell_size)
         return (ix, iy) in self.goal_cells
 
-    def observation(self, pose, wheels, *, ir_values=None, yellow_detected=None):
+    def observation(self, pose, wheels, *, ir_values=None, yellow_detected=None,
+                    motion_stagnation=0.):
         pose = np.asarray(pose)
         if self.hidden_goal:
             xmin, xmax, ymin, ymax = self.bounds
@@ -236,7 +237,8 @@ class NavigationMap:
             ir = self.ir_ranges(pose) if ir_values is None else np.asarray(ir_values, dtype=float)
             yellow = self.yellow_detected(pose) if yellow_detected is None else bool(yellow_detected)
             return np.concatenate([np.asarray(wheels)/self.config.wheel_limit, ir, xy,
-                                   [math.sin(pose[2]), math.cos(pose[2]), float(yellow)]])\
+                                   [math.sin(pose[2]), math.cos(pose[2]),
+                                    np.clip(motion_stagnation, 0., 1.), float(yellow)]])\
                 .astype(np.float32)
         target = self.guidance(pose[:2])[0] if self.guided else self.goal
         delta = target-pose[:2]
@@ -252,13 +254,15 @@ class NavigationMap:
     def metadata(self):
         if self.hidden_goal:
             return dict(format_version=1, algorithm='hidden_goal', signature=self.signature,
-                        config=asdict(self.config), observation_version=4,
+                        config=asdict(self.config), observation_version=5,
                         observation=('continuous normalized wheel speeds, five continuous IR ranges, '
-                                     'continuous GPS x/y, sin/cos heading, yellow camera flag'),
+                                     'continuous GPS x/y, sin/cos heading, continuous stagnation signal, '
+                                     'yellow camera flag'),
                         observation_fields=('wheel_left_norm','wheel_right_norm',
                                             'ir_front_left_norm','ir_front_right_norm',
                                             'ir_left_norm','ir_rear_norm','ir_right_norm',
-                                            'x_norm','y_norm','heading_sin','heading_cos','yellow_detected'),
+                                            'x_norm','y_norm','heading_sin','heading_cos',
+                                            'stagnation_fraction','yellow_detected'),
                         observation_size=self.observation_size,
                         action='two continuous normalized values: forward speed and yaw rate',
                         guidance='none; terminal success comes from the yellow color sensor',

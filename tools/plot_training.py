@@ -121,6 +121,7 @@ def read_state_space(path):
             try:
                 row = {key: float(raw[key]) for key in (
                     'timesteps', 'episode', 'x_m', 'y_m', 'heading_rad',
+                    'stagnation_fraction', 'anti_spin_penalty',
                     'ir_front_left_m', 'ir_front_right_m', 'ir_left_m',
                     'ir_rear_m', 'ir_right_m', 'action_forward_m_s',
                     'action_yaw_rate_rad_s')}
@@ -130,7 +131,7 @@ def read_state_space(path):
             except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                 # A live writer may be midway through its final CSV row.
                 continue
-            if len(state) != 12 or not np.all(np.isfinite(state)) or not all(math.isfinite(v) for v in row.values() if isinstance(v, float)):
+            if len(state) != 13 or not np.all(np.isfinite(state)) or not all(math.isfinite(v) for v in row.values() if isinstance(v, float)):
                 continue
             row['state_vector'] = state
             rows.append(row)
@@ -346,7 +347,8 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         _save(q_fig, output/'q_learning.png')
         plt.close(q_fig)
     if state_rows:
-        state_fig, state_axes = plt.subplots(1, 3, figsize=(17, 5.2))
+        state_fig, state_axes = plt.subplots(2, 2, figsize=(13, 9))
+        state_axes = state_axes.flat
         state_fig.suptitle('State dan aksi kontinu selama training SAC',
                            x=.06, y=.98, ha='left', fontsize=18, fontweight='bold')
         state_fig.subplots_adjust(left=.06, right=.96, bottom=.16, top=.84, wspace=.35)
@@ -377,7 +379,15 @@ def generate(report_dir=ROOT/'reports/continuous', output_dir=None, window=20):
         state_axes[2].legend([*state_axes[2].lines, *yaw_ax.lines],
                              [line.get_label() for line in [*state_axes[2].lines, *yaw_ax.lines]],
                              fontsize=8, frameon=False, loc='upper right')
-        for ax in (state_axes[0], state_axes[1], state_axes[2], yaw_ax):
+        state_axes[3].plot(steps, [row['stagnation_fraction'] for row in state_rows],
+                           color='#548b45', lw=1, label='Diam/stagnasi')
+        state_axes[3].step(steps, [min(1., row['anti_spin_penalty']/.04) for row in state_rows],
+                           where='post', color=ORANGE, lw=1, label='Penalti anti-spin')
+        state_axes[3].set(title='Diam atau berputar tanpa berpindah', xlabel='Langkah training',
+                          ylabel='Fraksi stagnasi / penalti aktif (0–1)')
+        state_axes[3].set_ylim(-.01, 1.05)
+        state_axes[3].legend(fontsize=8, frameon=False)
+        for ax in (*state_axes, yaw_ax):
             ax.spines['top'].set_visible(False)
             ax.grid(axis='both', alpha=.25)
         _save(state_fig, output/'state_space.png')

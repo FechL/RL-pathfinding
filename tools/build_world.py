@@ -69,6 +69,18 @@ def generate_walls():
                     "position": [x_min+(x+0.5)*cell, y_min+(y+1)*cell],
                     "size": [cell+thickness, thickness, wall_height],
                 })
+    # Treat the arena perimeter as part of the same wall set used by the
+    # physical world, IR sensor model, and collision checks.
+    walls.extend([
+        {"name": "BoundaryWest", "position": [x_min-thickness/2, 0.],
+         "size": [thickness, height*cell+thickness, wall_height]},
+        {"name": "BoundaryEast", "position": [-x_min+thickness/2, 0.],
+         "size": [thickness, height*cell+thickness, wall_height]},
+        {"name": "BoundarySouth", "position": [0., y_min-thickness/2],
+         "size": [width*cell+thickness, thickness, wall_height]},
+        {"name": "BoundaryNorth", "position": [0., -y_min+thickness/2],
+         "size": [width*cell+thickness, thickness, wall_height]},
+    ])
     return walls
 
 

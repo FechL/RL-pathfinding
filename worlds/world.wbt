@@ -1093,6 +1093,26 @@ DEF WALLS Group {
       size 0.0500 0.4500 0.180
       name "V9_15"
     }
+    MazeWall {
+      translation -3.2250 0.0000 0.090
+      size 0.0500 6.4500 0.180
+      name "BoundaryWest"
+    }
+    MazeWall {
+      translation 3.2250 0.0000 0.090
+      size 0.0500 6.4500 0.180
+      name "BoundaryEast"
+    }
+    MazeWall {
+      translation 0.0000 -3.2250 0.090
+      size 6.4500 0.0500 0.180
+      name "BoundarySouth"
+    }
+    MazeWall {
+      translation 0.0000 3.2250 0.090
+      size 6.4500 0.0500 0.180
+      name "BoundaryNorth"
+    }
   ]
 }
 DEF START Pose { translation -3.0000 -3.0000 0 }

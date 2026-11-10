@@ -121,6 +121,10 @@ def run(supervisor, algorithm):
     trail=[pose[:2].tolist()];telemetry=[]
     commands=np.zeros(2);measured=np.zeros(2);previous_encoder=np.array([e.getValue() for e in encoders])
     steps=0;success=False;violation=None
+    stagnation_steps=0
+    stagnation_limit=max(1,round(1.5/nav.config.dt))
+    stagnation_fraction=0.
+    last_policy_position=pose[:2].copy()
     policy_ticks = 1 if nav.guided else round(nav.config.dt/dt)
     minimum_clearance = .005 if nav.guided else 0.
     clearance=physical_clearance(pose[:2],walls,bounds)
@@ -157,7 +161,15 @@ def run(supervisor, algorithm):
             clipped_measured=np.clip(measured,-nav.config.wheel_limit,nav.config.wheel_limit)
             if hidden_goal:
                 ir=np.array([infrared_range_m(sensors[name])/.4 for name in sensor_names],dtype=np.float32)
-                observation=nav.observation(pose,clipped_measured,ir_values=ir,yellow_detected=yellow)
+                moved=float(np.linalg.norm(pose[:2]-last_policy_position))
+                if steps>0 and moved<.001:
+                    stagnation_steps+=1
+                else:
+                    stagnation_steps=0
+                stagnation_fraction=min(1.,stagnation_steps/stagnation_limit)
+                last_policy_position=pose[:2].copy()
+                observation=nav.observation(pose,clipped_measured,ir_values=ir,
+                    yellow_detected=yellow,motion_stagnation=stagnation_fraction)
             else:
                 observation=nav.observation(pose,clipped_measured)
             action=actor(observation)
@@ -169,6 +181,7 @@ def run(supervisor, algorithm):
                            ir={name:s.getValue() for name,s in sensors.items()})
         if hidden_goal:
             telemetry_row['yellow_detected']=yellow
+            telemetry_row['stagnation_fraction']=stagnation_fraction
         telemetry.append(telemetry_row)
         steps+=1
         if show and steps%2==0:view.update(pose[:2],pose[2],trail)

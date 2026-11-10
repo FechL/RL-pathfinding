@@ -171,7 +171,7 @@ class TrainingView:
                 f"State x/y/heading: {env.pose[0]:.2f} m, {env.pose[1]:.2f} m, {env.pose[2]:.2f} rad",
                 f"IR [FL,FR,L,B,R] / 0.4 m: [{ir}] | yellow={int(env.last_yellow)}",
                 f"Wheel rad/s: [{env.wheels[0]:.2f},{env.wheels[1]:.2f}] | aksi v={action_v:.2f} m/s, yaw={action_w:.2f} rad/s",
-                'State kontinu 12D: wheel 2 + IR 5 + GPS 2 + heading 2 + kamera 1',
+                f"State 13D: wheel + IR + GPS + arah + stagnasi + kamera | diam {env.stagnation_fraction*1.5:.1f}s",
             ]
             for i, line in enumerate(state_lines):
                 cv2.putText(frame, line, (x, 128+i*17), cv2.FONT_HERSHEY_SIMPLEX, .32,

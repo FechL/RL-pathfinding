@@ -33,6 +33,11 @@ class ContinuousDriveEnv(gym.Env):
         self.last_action = np.zeros(2, dtype=np.float32)
         self.last_ir = np.ones(5, dtype=np.float32)
         self.last_yellow = False
+        self.last_position = np.zeros(2, dtype=float)
+        self.stagnation_steps = 0
+        self.stagnation_limit = max(1, round(1.5/self.config.dt))
+        self.stagnation_fraction = 0.
+        self.anti_spin_penalty = 0.
 
     def sample_near_goal(self, radius, *, visible=False):
         for _ in range(1000):
@@ -91,9 +96,14 @@ class ContinuousDriveEnv(gym.Env):
         self.last_action[:] = 0
         self.last_ir = self.nav.ir_ranges(self.pose) if self.nav.hidden_goal else np.ones(5, dtype=np.float32)
         self.last_yellow = self.nav.yellow_detected(self.pose) if self.nav.hidden_goal else False
+        self.last_position = self.pose[:2].copy()
+        self.stagnation_steps = 0
+        self.stagnation_fraction = 0.
+        self.anti_spin_penalty = 0.
         self.potential = 0. if self.nav.hidden_goal else self.goal_distance()
         return self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
-                                    yellow_detected=self.last_yellow),{}
+                                    yellow_detected=self.last_yellow,
+                                    motion_stagnation=self.stagnation_fraction),{}
 
     def step(self, action):
         if self.finished: raise RuntimeError('Reset after termination or truncation')
@@ -124,11 +134,25 @@ class ContinuousDriveEnv(gym.Env):
             self.last_yellow = self.nav.yellow_detected(self.pose)
             success = bool(self.last_yellow)
             potential = 0.
+            moved = float(np.linalg.norm(self.pose[:2]-self.last_position))
+            self.last_position = self.pose[:2].copy()
+            # Penalize prolonged turning/stopping. Nearby front walls reduce
+            # the penalty so a useful pivot in a dead end stays possible.
+            front_clearance_m = float(np.min(self.last_ir[:2]))*.4
+            if moved < .001:
+                self.stagnation_steps += 1
+            else:
+                self.stagnation_steps = 0
+            self.stagnation_fraction = min(1., self.stagnation_steps/self.stagnation_limit)
+            wall_discount = float(np.clip((front_clearance_m-.05)/.17, .15, 1.))
+            self.anti_spin_penalty = (.04*wall_discount
+                if self.stagnation_steps >= self.stagnation_limit else 0.)
             # The yellow sensor is the only source of goal reward. A small
             # time and near-wall cost improves efficiency without target hints.
             reward = -.01
             nearest_wall_m = float(np.min(self.last_ir))*.4
             reward -= .02*max(0., (.12-nearest_wall_m)/.12)
+            reward -= self.anti_spin_penalty
         else:
             potential = self.goal_distance()
             success = np.linalg.norm(self.pose[:2]-self.nav.goal) <= self.config.goal_tolerance
@@ -148,9 +172,12 @@ class ContinuousDriveEnv(gym.Env):
         if self.step_callback is not None:
             self.step_callback(self, force=self.finished, dt=motor_dt)
         observation = self.nav.observation(self.pose,self.wheels,ir_values=self.last_ir,
-                                          yellow_detected=self.last_yellow)
+                                          yellow_detected=self.last_yellow,
+                                          motion_stagnation=self.stagnation_fraction)
         info = dict(is_success=bool(success),collision=collision,time_s=self.steps*self.config.dt,
-                    yellow_detected=bool(self.last_yellow),last_action=self.last_action.tolist())
+                    yellow_detected=bool(self.last_yellow),last_action=self.last_action.tolist(),
+                    stagnation_fraction=float(self.stagnation_fraction),
+                    anti_spin_penalty=float(self.anti_spin_penalty))
         if not self.nav.hidden_goal:
             info['goal_error_m'] = float(np.linalg.norm(self.pose[:2]-self.nav.goal))
         return observation,float(reward),terminated,truncated,info
