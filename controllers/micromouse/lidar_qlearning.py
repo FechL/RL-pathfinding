@@ -14,7 +14,7 @@ ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
 LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
 SAFE_DISTANCE = .12
-STATE_VERSION = 3
+STATE_VERSION = 4
 
 
 def safe_actions(lidar_sectors):
@@ -172,7 +172,7 @@ class TabularLidarQ:
     def load(cls, path, seed=0):
         payload=json.loads(Path(path).read_text())
         if payload.get('format_version')!=STATE_VERSION or payload.get('algorithm')!='tabular_q_lidar':
-            raise ValueError('This LiDAR Q-table uses an older state schema; retrain with `bash run.sh train` before simulation')
+            raise ValueError('This LiDAR Q-table uses an older state/reward version; retrain with `bash run.sh train` before simulation')
         if tuple(item['name'] for item in payload['actions'])!=ACTION_NAMES:
             raise ValueError('Q-table action schema does not match this robot')
         agent=cls(payload['alpha'],payload['gamma'],seed)

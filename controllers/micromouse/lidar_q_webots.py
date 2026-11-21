@@ -103,6 +103,8 @@ def run(supervisor):
         commands=config.wheels_for_velocity(*ACTION_VW[action],commands,timestep/1000)
         for motor,speed in zip(motors,commands):motor.setVelocity(float(speed))
         telemetry.append(dict(time_s=supervisor.getTime()-began,pose=pose.tolist(),
+                              distance_from_base_m=float(np.linalg.norm(point-np.asarray(start))),
+                              distance_to_goal_m=float(np.linalg.norm(point-np.asarray(goal))),
                               q_state=list(state),q_values=agent.values(state).tolist(),
                               action=ACTION_NAMES[action],action_index=action,
                               lidar_sector_min_m=sectors.tolist(),
@@ -120,6 +122,7 @@ def run(supervisor):
                 algorithm='tabular_q_lidar',policy=str(policy_path.resolve()),
                 table_states=len(agent.q),goal=tuple(goal),start=start,final_position=final.tolist(),
                 goal_error_m=float(np.linalg.norm(final-np.asarray(goal))),
+                distance_from_base_m=float(np.linalg.norm(final-np.asarray(start))),
                 simulation_duration_s=supervisor.getTime()-began,movement_steps=steps,
                 travelled_length_m=path_length(trail),min_physical_clearance_m=clearance,
                 trajectory=trail,telemetry=telemetry)

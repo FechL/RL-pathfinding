@@ -14,7 +14,8 @@ sys.path.insert(0,str(ROOT/'controllers/micromouse'))
 sys.path.insert(0,str(ROOT/'tools'))
 
 from continuous_control import NavigationMap
-from lidar_q_env import LidarQEnvironment
+from lidar_q_env import (FORWARD_LIDAR_WEIGHT,GPS_TRAVEL_COST_PER_METER,
+                         LidarQEnvironment)
 from lidar_qlearning import ACTION_NAMES,TabularLidarQ,safe_actions
 from q_learning import scene_signature
 from train_q_learning import read_world
@@ -43,6 +44,9 @@ def evaluate(env,agent,runs=12):
             if truncated:break
         results.append(dict(seed=index,reward=total,steps=env.steps,
                             success=success,collision=collision,
+                            distance_from_base_m=math.hypot(env.pose[0]-env.nav.start[0],
+                                                            env.pose[1]-env.nav.start[1]),
+                            travelled_distance_m=env.travelled_distance,
                             distance_to_goal_m=float(info.get('distance_to_goal_m',
                                 math.hypot(env.nav.goal[0]-env.pose[0],env.nav.goal[1]-env.pose[1])))))
     return results
@@ -92,7 +96,9 @@ def main():
                   lidar_sector_order=['front','front-left','left','rear-left','rear','rear-right','right','front-right'],
                   state_schema='relative goal bearing 16 bins; goal distance 7 bins; eight lidar ranges each 3 bins; previous action',
                   action_names=ACTION_NAMES,goal_input='known goal coordinates and relative bearing/distance',
-                  reward='8 x goal-distance progress - 0.025 per decision - near-wall penalty - low-progress spin penalty; +60 goal; -30 collision',
+                  reward='8 x GPS goal-distance progress - 0.025 per decision - 0.5 per metre travelled - maneuver-direction clearance penalty (forward LiDAR weight 1.5x) - low-progress spin penalty; +60 goal; -30 collision',
+                  forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
+                  gps_travel_cost_per_meter=GPS_TRAVEL_COST_PER_METER,
                   lidar_safety_mask='blocks only actions whose forward, diagonal, or rear sector is under 0.12 m; stop is a fallback only when no movement is safe',
                   collision_reward=-30.,goal_reward=60.,maze_signature=signature)
     (run_dir/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
@@ -104,7 +110,8 @@ def main():
     began=time.perf_counter();success_count=collision_count=0;first_success=None;total_steps=0
     episodes_completed=0
     fieldnames=('episode','phase','epsilon','reward','steps','success','collision',
-                'goal_distance_m','min_front_clearance_m','q_states','updates')
+                'goal_distance_m','distance_from_base_m','travelled_distance_m',
+                'min_front_clearance_m','q_states','updates')
     try:
         with history_path.open('w',newline='') as csvfile:
             writer=csv.DictWriter(csvfile,fieldnames=fieldnames,lineterminator='\n')
@@ -133,6 +140,8 @@ def main():
                 writer.writerow(dict(episode=episode+1,phase=phase,epsilon=epsilon,
                     reward=env.episode_return,steps=env.steps,success=success,collision=collision,
                     goal_distance_m=final_info.get('distance_to_goal_m',float('nan')),
+                    distance_from_base_m=final_info.get('distance_from_base_m',float('nan')),
+                    travelled_distance_m=final_info.get('travelled_distance_m',float('nan')),
                     min_front_clearance_m=final_info.get('front_clearance_m',float('nan')),
                     q_states=len(agent.q),updates=updates))
                 csvfile.flush()
@@ -158,6 +167,9 @@ def main():
                  evaluation_runs=len(eval_results),evaluation_successes=sum(x['success'] for x in eval_results),
                  evaluation_collisions=sum(x['collision'] for x in eval_results),
                  evaluation_mean_steps=sum(x['steps'] for x in eval_results)/len(eval_results),
+                 evaluation_mean_travelled_m=sum(x['travelled_distance_m'] for x in eval_results)/len(eval_results),
+                 evaluation_mean_distance_from_base_m=sum(x['distance_from_base_m'] for x in eval_results)/len(eval_results),
+                 evaluation_mean_goal_distance_m=sum(x['distance_to_goal_m'] for x in eval_results)/len(eval_results),
                  policy_path=str(table_path.resolve()))
     (run_dir/'evaluations.json').write_text(json.dumps(eval_results,indent=2)+'\n')
     (run_dir/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')

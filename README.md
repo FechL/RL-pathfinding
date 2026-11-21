@@ -11,9 +11,12 @@ forward/arc/turn/reverse/stop actions provide smooth wheel targets. A LiDAR
 safety mask checks each maneuver's travel direction at 0.12 m and only allows
 the stop fallback when no movement direction is clear.
 
-Reward encourages progress toward the known goal and strongly penalizes wall
-collisions (`-30`); reaching the goal gives `+60`. Near-wall clearance and
-turning without goal progress also carry penalties so learning favors safe paths.
+Reward uses GPS-equivalent goal-distance progress and strongly penalizes wall
+collisions (`-30`); reaching the goal gives `+60`. The forward/diagonal-forward
+LiDAR clearance penalty has 1.5× weight compared with reverse, and turning
+without goal progress also carries a penalty. GPS travel distance adds a small
+per-metre cost to discourage long loops; the monitor shows both distance from
+the start/base and total path travelled.
 Reward is accumulated over each
 episode, and Q-learning bootstraps with `gamma=0.995`. Training alternates an
 exploration phase with a lower-epsilon exploitation phase. The kinematic
