@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import sys
+import time
 
 import torch
 from stable_baselines3 import SAC
@@ -72,6 +73,10 @@ class TrainingMonitor(BaseCallback):
         self.trials = 0
         self.next_route = 0
         self.best = None
+        self.started = 0.
+
+    def _on_training_start(self):
+        self.started = time.perf_counter()
 
     def choose_route(self):
         if not self.timed_routes:
@@ -96,6 +101,7 @@ class TrainingMonitor(BaseCallback):
             route_id = self.routes.get(replay or route)
             row = dict(episode=len(self.rows) + 1, phase=phase, route_id=route_id,
                        total_steps=self.num_timesteps,
+                       elapsed_training_s=time.perf_counter() - self.started,
                        **{key: info[key] for key in ('success','steps','reward','collision_count','duration_s','distance_m')})
             self.rows.append(row)
             self.writer.writerow(row)
@@ -127,6 +133,8 @@ class TrainingMonitor(BaseCallback):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--steps', type=int, default=100000)
+    parser.add_argument('--update-every', type=int, choices=(1, 2, 4, 8), default=2,
+                        help='Satu update jaringan per N langkah simulasi. N lebih besar mengurangi biaya komputasi.')
     parser.add_argument('--timeout', type=float, default=300.)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--exploration-fraction', type=float, default=.6)
@@ -154,8 +162,10 @@ def main():
         view = TrainingView(nav, args.render_speed)
     torch.set_num_threads(1)
     model = SAC('MlpPolicy', mission, seed=args.seed, gamma=.98, learning_starts=min(256, args.steps // 4),
+                train_freq=(args.update_every, 'step'), gradient_steps=1,
                 policy_kwargs=dict(net_arch=[64, 64]), device='cpu', verbose=0)
-    fields = ('episode','phase','route_id','total_steps','success','steps','reward','collision_count','duration_s','distance_m')
+    fields = ('episode','phase','route_id','total_steps','elapsed_training_s','success','steps',
+              'reward','collision_count','duration_s','distance_m')
     with (directory / 'training.csv').open('w', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
@@ -166,6 +176,7 @@ def main():
         except KeyboardInterrupt:
             print('Training dihentikan, menyimpan actor SAC.', flush=True)
         finally:
+            training_seconds = time.perf_counter() - monitor.started if monitor.started else 0.
             if view:
                 view.close()
     export_actor(model, directory / 'actor.json')
@@ -175,7 +186,12 @@ def main():
         writer.writeheader()
         writer.writerows(monitor.losses)
     plots(monitor.rows, monitor.losses, directory)
+    first_success = next((row for row in monitor.rows if row['success']), None)
     summary = dict(algorithm=ALGORITHM, seed=args.seed, steps=model.num_timesteps, timeout_s=args.timeout,
+                   training_seconds=training_seconds, render=args.render,
+                   update_every_steps=args.update_every,
+                   first_success_step=first_success['total_steps'] if first_success else None,
+                   first_success_training_s=first_success['elapsed_training_s'] if first_success else None,
                    episodes=len(monitor.rows), routes_found=len(monitor.routes), best_speed_trial=monitor.best,
                    exploration_fraction=args.exploration_fraction,
                    routes=[dict(route_id=route_id, targets=targets) for targets, route_id in monitor.routes.items()])

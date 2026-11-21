@@ -67,6 +67,17 @@ uji kecepatan dimulai setelah kuota langkah eksplorasi (default 60%)
 terpenuhi dan ada rute sukses. Tambahkan `--no-render` untuk training tanpa
 jendela. Pengendali Webots memuat actor JSON tanpa dependensi PyTorch.
 
+Untuk membandingkan waktu training, jalankan kedua mode dengan `--no-render`,
+`--steps` dan `--seed` yang sama. `training_seconds` mengukur waktu proses
+training di luar evaluasi dan ekspor. `first_success_step` dan
+`first_success_training_s` mengukur kapan goal pertama tercapai. Kolom
+`duration_s` di CSV mengukur waktu perjalanan dalam simulasi.
+
+SAC secara default melakukan satu pembaruan jaringan setiap dua langkah
+simulasi. Gunakan `--update-every 1` untuk konfigurasi lama atau
+`--update-every 4` untuk mengurangi biaya komputasi lebih jauh. Catat pilihan ini
+saat membandingkan kualitas model karena jumlah pembaruan ikut berubah.
+
 Perintah `compare` menguji kebijakan yang dibekukan dalam simulator kinematik.
 Keduanya mengikuti urutan target yang sama dari `routes.json` dengan tiga
 arah hadap awal dan timeout yang sama. File `trials.csv`, `summary.json`,

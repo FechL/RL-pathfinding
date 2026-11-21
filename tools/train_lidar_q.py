@@ -128,6 +128,7 @@ def evaluate(env,agent,runs=40,max_steps=120):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--episodes',type=int,default=3000)
+    parser.add_argument('--steps',type=int,help='Optional total training step budget across episodes')
     parser.add_argument('--max-steps',type=int,
                         help='Optional decision cap; by default the timeout sets the episode length')
     parser.add_argument('--timeout',type=float,default=300.)
@@ -141,6 +142,7 @@ def main():
     parser.add_argument('--run-dir',type=Path)
     args=parser.parse_args()
     if (args.episodes<2 or (args.max_steps is not None and args.max_steps<1)
+            or (args.steps is not None and args.steps<1)
             or not math.isfinite(args.timeout) or args.timeout<=0 or args.evaluation_runs<1):
         parser.error('episodes >=2; max-steps, timeout and evaluation-runs must be positive')
     if not 0<args.exploration_fraction<1 or not 0<args.alpha<=1 or not 0<=args.gamma<=1:
@@ -166,7 +168,8 @@ def main():
     table_path=run_dir/'q_table.json'
     history_path=run_dir/'training.csv'
     routes_path=run_dir/'routes.json'
-    exploration_end=max(1,int(args.episodes*args.exploration_fraction))
+    phase_budget = args.steps if args.steps is not None else args.episodes
+    exploration_end=max(1,int(phase_budget*args.exploration_fraction))
     signature=scene_signature(maze)
     manifest=dict(created_at_utc=created.isoformat(),seed=args.seed,episodes=args.episodes,
                   max_steps=env.max_steps,step_duration_s=env.decision_seconds,
@@ -177,7 +180,8 @@ def main():
                   action_names=ACTION_NAMES,
                   role='tabular Q-learning controls continuous differential-drive motion for an online LiDAR search from maze start to goal',
                   training_tasks='online LiDAR exploration followed by timed Q-learning replays of discovered routes',
-                  exploration_episodes_min=exploration_end,
+                  exploration_episodes_min=exploration_end if args.steps is None else None,
+                  exploration_steps_min=exploration_end if args.steps is not None else None,
                   speed_test_heading_rad=0.,
                   reward='4 x GPS next-waypoint progress + 0.20 x heading error reduction - time, travel, clearance and idle costs; +4 waypoint; +120 goal; -100 collision',
                   forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
@@ -195,12 +199,15 @@ def main():
         view=LidarQView(nav,args.render_speed)
 
     began=time.perf_counter();success_count=collision_count=0;first_success=None;total_steps=0
+    first_success_step=None
+    first_success_training_s=None
     episodes_completed=0
     discovered = {}
     candidates = []
     speed_trials = 0
     best_trial = None
     fieldnames=('episode','phase','route_id','routes_found','best_speed_time_s',
+                'total_steps','elapsed_training_s',
                 'epsilon','reward','steps','success','collision','collision_count',
                 'goal_distance_m','route_waypoints','cells_visited','duration_s','search_exhausted',
                 'distance_from_base_m','travelled_distance_m','min_front_clearance_m',
@@ -210,25 +217,33 @@ def main():
             writer=csv.DictWriter(csvfile,fieldnames=fieldnames,lineterminator='\n')
             writer.writeheader()
             for episode in range(args.episodes):
-                if episode >= exploration_end and discovered and not candidates:
+                if args.steps is not None and total_steps >= args.steps:
+                    break
+                max_steps = env.max_steps if args.steps is None else min(env.max_steps, args.steps-total_steps)
+                phase_progress = total_steps if args.steps is not None else episode
+                if phase_progress >= exploration_end and discovered and not candidates:
                     candidates = sorted(discovered.values(), key=lambda route: route['exploration_time_s'])
                     print(f'UJI KECEPATAN mulai episode {episode+1} | kandidat: {len(candidates)}', flush=True)
                 phase = 'speed_test' if candidates else 'exploration'
                 candidate = candidates[speed_trials % len(candidates)] if candidates else None
-                epsilon=epsilon_for_episode(episode,args.episodes,exploration_end,bool(candidate))
+                epsilon=epsilon_for_episode(phase_progress,phase_budget,exploration_end,bool(candidate))
                 heading=0. if candidate else rng.uniform(-math.pi,math.pi)
                 env.training_phase = phase
                 env.routes_found = len(discovered)
                 env.training_route_id = candidate['route_id'] if candidate else None
                 env.best_speed_time = best_trial['duration_s'] if best_trial else None
                 final_info,updates=run_episode(env,agent,epsilon,heading,
-                                               env.max_steps,seed=episode,learn=True,view=view,
+                                               max_steps,seed=episode,learn=True,view=view,
                                                replay=candidate['targets'] if candidate else (),
                                                episode=episode+1,steps_offset=total_steps)
                 total_steps+=updates
+                elapsed = time.perf_counter()-began
                 success=final_info['success'];collision=final_info['collision']
                 success_count+=success;collision_count+=collision
-                if success and first_success is None:first_success=episode+1
+                if success and first_success is None:
+                    first_success=episode+1
+                    first_success_step=total_steps
+                    first_success_training_s=elapsed
                 route_id = candidate['route_id'] if candidate else None
                 duration = final_info['duration_s']
                 if candidate:
@@ -252,6 +267,7 @@ def main():
                     route['exploration_time_s'] = min(duration, route['exploration_time_s'])
                     route_id = route['route_id']
                 writer.writerow(dict(episode=episode+1,phase=phase,route_id=route_id,
+                    total_steps=total_steps,elapsed_training_s=elapsed,
                     routes_found=len(discovered),best_speed_time_s=best_trial['duration_s'] if best_trial else None,
                     epsilon=epsilon,
                     reward=final_info['reward'],steps=final_info['steps'],
@@ -274,8 +290,9 @@ def main():
     except KeyboardInterrupt:
         print('Training dihentikan; menyimpan Q-table sementara.',flush=True)
     finally:
+        training_seconds=time.perf_counter()-began
         agent.save(table_path,{**manifest,'episodes_completed':episodes_completed,
-                               'elapsed_training_s':time.perf_counter()-began})
+                               'elapsed_training_s':training_seconds})
         routes_path.write_text(json.dumps(dict(routes=list(discovered.values()),
                                               best_speed_trial=best_trial),indent=2)+'\n')
         if view:view.close()
@@ -283,10 +300,12 @@ def main():
     eval_results=evaluate(env,agent,args.evaluation_runs,env.max_steps)
     summary=dict(**manifest,episodes_completed=episodes_completed,
                  first_success_episode=first_success,training_successes=success_count,
+                 steps=total_steps,render=args.render,first_success_step=first_success_step,
+                 first_success_training_s=first_success_training_s,
                  training_collisions=collision_count,q_states=len(agent.q),
                  routes_found=len(discovered),speed_trials=speed_trials,
                  best_speed_trial=best_trial,
-                 training_seconds=time.perf_counter()-began,
+                 training_seconds=training_seconds,
                  evaluation_runs=len(eval_results),
                  evaluation_successes=sum(x['success'] for x in eval_results),
                  evaluation_collisions=sum(x['collision'] for x in eval_results),
