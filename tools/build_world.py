@@ -70,7 +70,7 @@ def generate_walls():
                     "size": [cell+thickness, thickness, wall_height],
                 })
     # Treat the arena perimeter as part of the same wall set used by the
-    # physical world, IR sensor model, and collision checks.
+    # physical world, lidar model, and collision checks.
     walls.extend([
         {"name": "BoundaryWest", "position": [x_min-thickness/2, 0.],
          "size": [thickness, height*cell+thickness, wall_height]},
@@ -153,7 +153,7 @@ EXTERNPROTO "../protos/Micromouse.proto"
 WorldInfo {{
   basicTimeStep 16
   title "{LAYOUT['title']}"
-  info [ "{width} x {height} cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses continuous SAC actions, infrared sensors, and a yellow color camera." ]
+  info [ "{width} x {height} cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses tabular Q-learning, a 360-degree lidar, and a known goal." ]
 }}
 DEF OVERVIEW Viewpoint {{
   orientation -0.29 0.54 0.79 1.27

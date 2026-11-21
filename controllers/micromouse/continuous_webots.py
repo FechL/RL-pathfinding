@@ -10,6 +10,7 @@ import numpy as np
 from continuous_control import NavigationMap, read_policy
 from planner import ROBOT_RADIUS, Obstacle, distance, path_length, physical_clearance
 from motion_metrics import motion_metrics
+from lidar_qlearning import aggregate_point_cloud
 
 
 def read_hidden_scene(supervisor):
@@ -31,12 +32,6 @@ def read_hidden_scene(supervisor):
         walls.append(Obstacle(name, 'wall', tuple(position[:2]), tuple(size[:2])))
     bounds = (-width/2, width/2, -height/2, height/2)
     return robot, walls, bounds, cell_size
-
-
-def infrared_range_m(sensor):
-    """Invert the four physical IR sensors' lookup table into metres."""
-    raw = float(sensor.getValue())
-    return float(np.interp(raw, [0, 450, 1500, 2800, 4095], [.4, .2, .1, .05, 0]))
 
 
 def camera_sees_yellow(camera):
@@ -100,9 +95,9 @@ def run(supervisor, algorithm):
     for motor,encoder in zip(motors,encoders):
         motor.setPosition(float('inf'));motor.setVelocity(0);encoder.enable(timestep)
     sensors={}
-    sensor_names=('front left sensor','front right sensor','left side sensor','right side sensor')
-    for name in sensor_names:
-        sensor=supervisor.getDevice(name);sensor.enable(timestep);sensors[name]=sensor
+    lidar=None
+    if hidden_goal:
+        lidar=supervisor.getDevice('lidar');lidar.enable(timestep);lidar.enablePointCloud()
     camera=None
     if hidden_goal:
         camera=supervisor.getDevice('yellow camera')
@@ -134,7 +129,7 @@ def run(supervisor, algorithm):
     clearance=physical_clearance(pose[:2],walls,bounds)
     best_progress=math.inf;last_progress=began
     inference_seconds=0.
-    guidance = ('four IR sensors and yellow camera flag; no goal coordinates' if hidden_goal else
+    guidance = ('aggregated 360-degree lidar and yellow camera flag; no goal coordinates' if hidden_goal else
                 'known-map local bearing' if nav.guided else 'goal and simulated local range observations')
     print(f'{label}: continuous forward velocity / yaw-rate policy; {guidance}',flush=True)
     while supervisor.step(timestep)!=-1:
@@ -164,7 +159,8 @@ def run(supervisor, algorithm):
             timer=time.perf_counter()
             clipped_measured=np.clip(measured,-nav.config.wheel_limit,nav.config.wheel_limit)
             if hidden_goal:
-                ir=np.array([infrared_range_m(sensors[name])/.4 for name in sensor_names],dtype=np.float32)
+                lidar_sectors=aggregate_point_cloud(lidar.getPointCloud())
+                ir=np.clip(lidar_sectors[[1,7,2,6]]/.4,0.,1.).astype(np.float32)
                 cell=nav.maze.state(pose[:2])
                 if cell!=current_cell:
                     current_cell=cell
@@ -189,9 +185,8 @@ def run(supervisor, algorithm):
         for motor,command in zip(motors,commands):motor.setVelocity(float(command))
         telemetry_row=dict(time_s=current_time-began,pose=pose.tolist(),action=action.tolist(),
                            commanded_wheels=commands.tolist(),measured_wheels=measured.tolist(),
-                           ir_raw={name:s.getValue() for name,s in sensors.items()})
+                           lidar_sector_min_m=lidar_sectors.tolist() if hidden_goal else None)
         if hidden_goal:
-            telemetry_row['ir_range_m']={name:float(value*.4) for name,value in zip(sensor_names,ir)}
             telemetry_row['yellow_detected']=yellow
             telemetry_row['stagnation_fraction']=stagnation_fraction
             telemetry_row['cell_visit_fraction']=cell_visit_fraction

@@ -1,6 +1,6 @@
 #VRML_SIM R2025a utf8
 # template language: javascript
-# Small differential-drive micromouse with infrared, color and onboard localization sensors.
+# Small differential-drive micromouse with a 360-degree lidar and localization sensors.
 PROTO Micromouse [
   field SFVec3f    translation        0 0 0
   field SFRotation rotation           0 0 1 0
@@ -95,34 +95,19 @@ Robot {
         physics Physics { density -1 mass 0.008 }
       }
     }
-    # Infrared distance sensors; exposed as the future RL observation vector.
-    DistanceSensor {
-      name "front left sensor"
-      type "infra-red"
-      translation 0.052 0.026 0.055
-      rotation 0 0 1 -0.20
-      lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
-    }
-    DistanceSensor {
-      name "front right sensor"
-      type "infra-red"
-      translation 0.052 -0.026 0.055
-      rotation 0 0 1 0.20
-      lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
-    }
-    DistanceSensor {
-      name "left side sensor"
-      type "infra-red"
-      translation 0 0.053 0.055
-      rotation 0 0 1 1.5708
-      lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
-    }
-    DistanceSensor {
-      name "right side sensor"
-      type "infra-red"
-      translation 0 -0.053 0.055
-      rotation 0 0 1 -1.5708
-      lookupTable [ 0 4095 0, 0.05 2800 0.01, 0.10 1500 0.01, 0.20 450 0.01, 0.40 0 0.01 ]
+    # Full planar 360-degree scan; the Q table consumes eight sector minima.
+    Lidar {
+      name "lidar"
+      translation 0 0 0.14
+      horizontalResolution 128
+      fieldOfView 6.283185
+      verticalFieldOfView 0.05
+      numberOfLayers 1
+      near 0.02
+      minRange 0.02
+      maxRange 4
+      type "fixed"
+      noise 0.002
     }
     # Downward camera: reaching the yellow floor is the only goal signal.
     Camera {

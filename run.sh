@@ -16,6 +16,10 @@ case "$mode" in
         if [[ "$mode" == "train" ]]; then
             if [[ "${1:-}" == "--algorithm" ]]; then
                 case "${2:-}" in
+                    q_learning|lidar_q)
+                        shift 2
+                        exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
+                        ;;
                     naf)
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_naf.py" --render --render-speed 1 "$@"
@@ -33,27 +37,28 @@ case "$mode" in
                         exec "$training_python" "$project_dir/tools/train_continuous.py" --warm-start --render "$@"
                         ;;
                     *)
-                        echo "Pilih algoritma training: hidden_goal (atau rl), sac, guided_rl, atau naf." >&2
+                        echo "Pilih algoritma training: q_learning, hidden_goal (atau rl), sac, guided_rl, naf." >&2
                         exit 2
                         ;;
                 esac
             fi
-            exec "$training_python" "$project_dir/tools/train_continuous.py" --hidden-goal --render "$@"
+            exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
         fi
         exec "$training_python" "$project_dir/tools/plot_training.py" "$@"
         ;;
     help|--help|-h)
         echo "bash run.sh                  Jalankan robot di Webots"
-        echo "bash run.sh train            Lihat robot, monitor SAC, dan grafik training live"
+        echo "bash run.sh train            Training tabular Q-learning dengan LiDAR dan tabel Q live"
+        echo "bash run.sh train --algorithm q_learning --episodes 1500"
         echo "bash run.sh train --render-speed 1   Tampilan kecepatan normal"
         echo "bash run.sh train --no-render       Training tanpa jendela"
         echo "bash run.sh train --steps 100000"
-        echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal"
+        echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal (legacy)"
         echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
         echo "bash run.sh sim --fast              Percepat simulasi Webots"
-        echo "bash run.sh sim --policy path.json  Jalankan actor tertentu"
-        echo "bash run.sh train --algorithm rl --timeout 180 --render-speed 16"
+        echo "bash run.sh sim --policy path.json  Jalankan Q-table tertentu"
+        echo "bash run.sh train --algorithm q_learning --timeout 120 --render-speed 16"
         echo "bash run.sh graphs           Buat grafik dari latihan tersimpan"
         echo "bash run.sh graphs --report-dir /path/ke/run"
         exit 0
@@ -62,7 +67,7 @@ case "$mode" in
         shift
         webots_mode=realtime
         webots_args=()
-        export MICROMOUSE_ALGORITHM=hidden_goal
+        export MICROMOUSE_ALGORITHM=q_learning
         while (($#)); do
             case "$1" in
                 --fast) webots_mode=fast; shift ;;
@@ -77,7 +82,7 @@ case "$mode" in
                             fi
                             shift 2
                             ;;
-                        *) echo "Pilih algoritma simulasi: hidden_goal (atau rl), naf, sac, rl_unguided, q_learning, atau astar." >&2; exit 2 ;;
+                        *) echo "Pilih algoritma simulasi: q_learning, hidden_goal (atau rl), naf, sac, rl_unguided, atau astar." >&2; exit 2 ;;
                     esac
                     ;;
                 --policy)

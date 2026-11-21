@@ -55,6 +55,21 @@ class ControlConfig:
         # Use the same blend for both wheels to approach the target together.
         return previous + min(response, slew)*delta
 
+    def wheels_for_velocity(self, linear, angular, previous, dt=None):
+        """Convert direct continuous v/w targets to slew-limited wheel speeds."""
+        linear, angular = float(linear), float(angular)
+        if not math.isfinite(linear) or not math.isfinite(angular):
+            raise ValueError('Expected finite linear and angular velocities')
+        desired = np.array([(linear-angular*self.axle_track/2)/self.wheel_radius,
+                            (linear+angular*self.axle_track/2)/self.wheel_radius])
+        desired *= min(1., self.wheel_limit/max(np.max(np.abs(desired)), 1e-9))
+        previous = np.asarray(previous, dtype=float)
+        delta = desired-previous
+        interval = self.dt if dt is None else float(dt)
+        response = -math.expm1(-interval/self.wheel_response_time_s)
+        slew = self.wheel_acceleration*interval/max(np.max(np.abs(delta)), 1e-9)
+        return previous + min(response, slew)*delta
+
     def integrate(self, pose, wheels, dt):
         v = self.wheel_radius * (wheels[0]+wheels[1])/2
         w = self.wheel_radius * (wheels[1]-wheels[0])/self.axle_track
@@ -136,6 +151,33 @@ class NavigationMap:
     def local_geometry(self, position):
         nearby = np.all(np.abs(self.wall_centers-position) <= self.wall_halves+self.ray_range+.1,axis=1)
         return self.wall_centers[nearby], self.wall_halves[nearby]
+
+    def lidar_scan(self, pose, resolution=128, maximum=4.):
+        """Simulate a 360-degree planar lidar scan in Webots beam order.
+
+        Beam zero points to the robot's right (-90 degrees); scans proceed
+        counter-clockwise through a complete revolution.
+        """
+        pose = np.asarray(pose, dtype=float)
+        relative = -math.pi/2 + np.arange(resolution)*2*math.pi/resolution
+        angles = pose[2]+relative
+        directions = np.stack([np.cos(angles), np.sin(angles)], axis=1)
+        nearby = np.all(np.abs(self.wall_centers-pose[:2]) <= self.wall_halves+maximum+.1, axis=1)
+        centers, halves = self.wall_centers[nearby], self.wall_halves[nearby]
+        xmin,xmax,ymin,ymax = self.bounds
+        border_centers=np.array([[xmin-.025,(ymin+ymax)/2],[xmax+.025,(ymin+ymax)/2],
+                                 [(xmin+xmax)/2,ymin-.025],[(xmin+xmax)/2,ymax+.025]])
+        border_halves=np.array([[.025,(ymax-ymin)/2],[.025,(ymax-ymin)/2],
+                                [(xmax-xmin)/2,.025],[(xmax-xmin)/2,.025]])
+        centers=np.concatenate([centers,border_centers])
+        halves=np.concatenate([halves,border_halves])
+        safe=np.where(np.abs(directions)<1e-10,1e-10,directions)
+        first=(centers[None,:,:]-halves[None,:,:]-pose[None,None,:2])/safe[:,None,:]
+        last=(centers[None,:,:]+halves[None,:,:]-pose[None,None,:2])/safe[:,None,:]
+        near=np.minimum(first,last).max(axis=2)
+        far=np.maximum(first,last).min(axis=2)
+        hits=np.where((far>=near)&(far>=0),np.maximum(near,0),maximum)
+        return np.clip(hits.min(axis=1),0,maximum).astype(np.float32)
 
     def free(self, a, b, radius=ROBOT_RADIUS+SAFETY_MARGIN):
         """Vectorized swept-disc conservative AABB test, including boundaries."""

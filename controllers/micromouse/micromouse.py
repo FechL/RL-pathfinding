@@ -1,4 +1,4 @@
-"""Continuous NAF and SAC control, with legacy Q-learning and A* baselines."""
+"""Tabular LiDAR Q-learning, continuous policies, and an A* baseline."""
 import json
 import math
 import os
@@ -6,7 +6,6 @@ from pathlib import Path
 import sys
 import time
 
-from q_learning import policy_path
 from motion_metrics import motion_metrics
 
 from planner import (GRID_RESOLUTION, ROBOT_RADIUS, SAFETY_MARGIN, Obstacle,
@@ -123,10 +122,19 @@ class MapView:
         self.text(image, legend, (self.pad, self.height-14), 0.40)
         return image
 
-    def update(self, position, heading, trail):
+    def update(self, position, heading, trail, lidar_points=None):
         image = self.background.copy()
         if len(trail) > 1:
             self.cv2.polylines(image, [self.np.array([self.pixel(p) for p in trail], dtype=self.np.int32)], False, (56, 184, 214), 2)
+        if lidar_points:
+            c,s=math.cos(heading),math.sin(heading)
+            for point in lidar_points[::4]:
+                local_distance=math.hypot(point.x,point.y)
+                if not math.isfinite(local_distance):continue
+                endpoint=(position[0]+c*point.x-s*point.y,
+                          position[1]+s*point.x+c*point.y)
+                color=(68,154,82) if local_distance>1. else (62,164,220) if local_distance>.35 else (65,75,215)
+                self.cv2.line(image,self.pixel(position),self.pixel(endpoint),color,1,self.cv2.LINE_AA)
         center = self.pixel(position)
         self.cv2.circle(image, center, max(5, round(ROBOT_RADIUS*self.scale)), (48, 89, 226), -1)
         nose = self.pixel((position[0]+0.10*math.cos(heading), position[1]+0.10*math.sin(heading)))
@@ -152,7 +160,11 @@ def main():
     except ImportError as error:
         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
 
-    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "hidden_goal")
+    algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
+    if algorithm == "q_learning":
+        from lidar_q_webots import run
+        run(Supervisor())
+        return
     if algorithm in ("naf", "sac", "rl", "rl_unguided", "hidden_goal"):
         from continuous_webots import run
         run(Supervisor(), algorithm)
@@ -174,12 +186,6 @@ def main():
     for motor in (left_motor, right_motor):
         motor.setPosition(float("inf"))
         motor.setVelocity(0)
-    distance_sensors = {}
-    for name in ("front left sensor", "front right sensor", "left side sensor", "right side sensor"):
-        sensor = supervisor.getDevice(name)
-        sensor.enable(timestep)
-        distance_sensors[name] = sensor
-
     show = os.environ.get("MICROMOUSE_NO_GUI") != "1" and (
         sys.platform != "linux" or bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")))
     output = Path(os.environ.get("MICROMOUSE_RESULTS_DIR", str(PROJECT / "results")))
@@ -189,15 +195,11 @@ def main():
         Path(capture).mkdir(parents=True, exist_ok=True)
     timer = time.perf_counter()
     policy_metadata = None
-    if algorithm == "q_learning":
-        policy_file = Path(os.environ.get("MICROMOUSE_POLICY", str(PROJECT / "models/q_learning.json")))
-        path, explored, policy_metadata = policy_path(start, goal, walls, bounds, cell_size, policy_file)
-        algorithm_label = "Q-Learning"
-    elif algorithm == "astar":
+    if algorithm == "astar":
         path, explored = plan_path(start, goal, walls, bounds)
         algorithm_label = "A*"
     else:
-        raise ValueError("MICROMOUSE_ALGORITHM must be hidden_goal, naf, sac, rl, rl_unguided, q_learning or astar")
+        raise ValueError("MICROMOUSE_ALGORITHM must be q_learning, hidden_goal, naf, sac, rl, rl_unguided or astar")
     planning_seconds = time.perf_counter()-timer
     print(f"Controller: {sys.executable}")
     print(f"Maze: {round((bounds[1]-bounds[0])/cell_size)} x {round((bounds[3]-bounds[2])/cell_size)} cells; walls: {len(walls)}; start: {start}; goal: {goal}")
@@ -294,7 +296,7 @@ def main():
     right_motor.setVelocity(0)
     final = tuple(gps.getValues()[:2])
     actual_node_position = robot.getField("translation").getSFVec3f()
-    sensor_values = {name: sensor.getValue() for name, sensor in distance_sensors.items()}
+    sensor_values = {}
     result = {
         "status": "success" if completed else "failed",
         "controller": f"{algorithm_label} with differential-drive micromouse following",

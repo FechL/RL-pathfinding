@@ -7,7 +7,7 @@ EXTERNPROTO "../protos/Micromouse.proto"
 WorldInfo {
   basicTimeStep 16
   title "Micromouse Maze Arena"
-  info [ "16 x 16 cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses continuous SAC actions, infrared sensors, and a yellow color camera." ]
+  info [ "16 x 16 cell maze with dead ends, loops, and a yellow goal tile." "Micromouse uses tabular Q-learning, a 360-degree lidar, and a known goal." ]
 }
 DEF OVERVIEW Viewpoint {
   orientation -0.29 0.54 0.79 1.27

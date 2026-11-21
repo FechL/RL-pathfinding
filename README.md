@@ -1,67 +1,68 @@
-# Micromouse Continuous SAC with a Hidden Goal
+# Micromouse Tabular Q-Learning with LiDAR
 
-The default learner uses **continuous Soft Actor-Critic (SAC)** in the fixed
-16 × 16 Webots maze. The actor outputs real-valued forward speed and yaw rate;
-it receives four continuous IR ranges (front-left, front-right, left, and
-right), wheel speeds, continuous GPS position, heading, stagnation and cell
-visit signals, and a one-bit yellow-camera reading. The policy and reward do not use
-the goal coordinates or goal distance. It succeeds when the camera detects
-the yellow floor tile. A collision ends the episode with a penalty; a separate
-180-second timeout prevents an episode from running forever. Per-step rewards
-are accumulated into the episode return; SAC also learns from discounted
-returns (`gamma=0.9995`). A first visit to a cell gives `+0.35`, revisiting
-costs up to `-0.05`, movement receives up to `+0.01` per step, and the agent
-pays `-0.015` per step plus a low-speed-spin penalty. Wall proximity
-reduces the spin penalty so the robot can turn in a dead end.
+The default learner is **tabular Q-learning**. The robot knows its current
+pose and the goal coordinates, but it receives no route or map path to follow.
+A 360° Webots LiDAR produces 128 range returns; the controller aggregates
+those readings into eight sector minimums (front, front-left, left, rear-left,
+rear, rear-right, right, front-right). Each sector becomes one of three
+distance bins for a sparse Q-table. The state also includes 16 bins of relative
+goal bearing, seven goal-distance bins, and the previous action. Seven smooth
+forward/arc/turn/reverse/stop actions provide continuous wheel targets. A
+LiDAR safety mask blocks forward turns when the front is too close and stops
+the robot if no direction has enough clearance.
+
+Reward encourages progress toward the known goal and strongly penalizes wall
+collisions (`-30`); reaching the goal gives `+60`. Near-wall clearance and
+turning without goal progress also carry penalties so learning favors safe paths.
+Reward is accumulated over each
+episode, and Q-learning bootstraps with `gamma=0.995`. Training alternates an
+exploration phase with a lower-epsilon exploitation phase. The kinematic
+training simulator uses the same maze geometry and synthetic 360° scan; the
+Webots simulation reads its physical LiDAR.
 
 ```bash
-bash run.sh train                         # training animation + live metrics
-bash run.sh train --algorithm rl          # same continuous hidden-goal SAC
+bash run.sh train                         # LiDAR Q-learning + live Q table
+bash run.sh train --algorithm q_learning --episodes 1500
 bash run.sh train --render-speed 16       # faster visible preview
-bash run.sh train --no-render             # fastest training, logs still saved
-bash run.sh train --steps 100000 --exploration-fraction 0.60
-bash run.sh sim                           # Webots robot run; hidden-goal actor
+bash run.sh train --no-render             # train without the window
+bash run.sh sim                           # Webots with the newest saved Q table
+bash run.sh sim --algorithm q_learning --policy reports/lidar_q_learning/runs/<run>/q_table.json
 bash run.sh sim --fast                    # Webots simulation speed mode
-bash run.sh graphs                        # graphs for the newest training run
+bash run.sh graphs                        # legacy SAC/NAF training graphs
 ```
 
-Training has two SAC phases. The first uses higher entropy for **exploration**;
-the second lowers target entropy for **exploitation**. Actions remain continuous
-in both phases. The live local window shows the robot moving from the mission
-start, its trajectory, four colored IR rays with distance readings, the
-yellow sensor bit, stagnation and cell-visit signals, reward, steps, success/collision rates, critic Q estimate,
-actor/critic loss, and entropy. Q here is SAC's critic estimate, not a Q-table.
-There is no web service: `run.sh` starts the local simulator and monitor.
+Click **BUKA Q-TABLE** or press `T`/`Q` during training to open the sparse
+state/action table. It pages through every discretized state learned so far,
+shows visits and Q values for each maneuver, and highlights the best safe
+action. The main
+window draws the LiDAR rays: green is clear, amber is farther than 0.35 m,
+and red is near a wall. The window also shows episode reward, epsilon,
+success/collision rates, goal distance and eight sector ranges. `[` and `]`
+page through table rows; press `T` or `Q` again to close it.
 
-Each run is kept under `reports/continuous_hidden_goal/runs/`. It saves the
-continuous state/action samples in `state_space.csv`, episode reward/steps and
-outcomes in `training.monitor.csv`, SAC metrics in `training_metrics.csv`, and
-plots including `figures/state_space.png`, `figures/episode_steps.png`, reward,
-success/collision, Q, losses, and entropy. State-space plots also show the
-sensor readings, exploration and anti-spin signals. The policy candidate is saved inside that run's
-`models/` folder. To try a candidate in Webots without replacing the default:
+Runs are stored under `reports/lidar_q_learning/runs/`; each run contains
+`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. The Q
+table is saved every ten episodes and when training exits, so it can be loaded
+directly by Webots using `--policy`.
 
-```bash
-bash run.sh sim --policy reports/continuous_hidden_goal/runs/<run>/models/hidden_goal_actor.json --fast
-```
+## Optional legacy continuous SAC
 
-`--activate` installs a policy as the default only after all fixed-seed
-kinematic evaluations reach the goal. Training and evaluation use a kinematic
-surrogate; validate successful policies in Webots physics separately. The
-training preview speed (`--render-speed`) changes wall-clock playback only;
-`--no-render` removes display delays. Webots simulation can use `--fast`.
-
-## Legacy guided continuous SAC
-
-The older known-goal SAC and guided fine-tuning modes remain available by
-selecting `sac` or `guided_rl` explicitly. They use a goal vector and shaped
-distance reward, unlike the default hidden-goal task.
+Older continuous SAC modes remain available by selecting `hidden_goal`, `sac`
+or `guided_rl`. Their actor policies are separate from the tabular LiDAR
+Q-table.
 
 ```bash
 bash run.sh train --algorithm sac --warm-start
 bash run.sh train --algorithm guided_rl
 bash run.sh sim --algorithm sac
 ```
+
+## Arsip eksperimen controller sebelumnya
+
+Bagian setelah ini mendokumentasikan eksperimen NAF/SAC dan baseline lama.
+Untuk controller yang sekarang, gunakan alur LiDAR tabular Q-learning di
+bagian atas README; itulah default untuk `bash run.sh train` dan
+`bash run.sh sim`.
 
 ## Tugas 8 — Continuous Deep Q-Learning
 
@@ -172,8 +173,8 @@ bash run.sh
 ```
 
 Webots uses `~/miniconda3/bin/python` via
-`controllers/micromouse/runtime.ini`. Running the exported actor needs only
-NumPy and OpenCV, not PyTorch. The model is `models/continuous_actor.json`;
+`controllers/micromouse/runtime.ini`. Running the older exported actor needs only
+NumPy and OpenCV, not PyTorch. Its model was `models/continuous_actor.json`;
 map, controller configuration and observation version are checked at load.
 No fallback controller is silently selected if the model is incompatible.
 
