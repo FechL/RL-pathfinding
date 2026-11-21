@@ -81,7 +81,7 @@ class LidarQEnvironment:
         self.last_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
         return self.last_state
 
-    def step(self, action, *, final_goal=True, scanning=False):
+    def step(self, action, *, final_goal=True, scanning=False, velocity=None):
         if self.finished:
             raise RuntimeError('Reset before beginning another episode')
         if not 0<=int(action)<len(ACTION_NAMES):
@@ -91,7 +91,8 @@ class LidarQEnvironment:
         old_position=self.pose[:2].copy()
         old_distance=float(np.linalg.norm(self.goal-self.pose[:2]))
         recovering = self.collision_recovery
-        linear, angular = (COLLISION_RECOVERY_SPEED, 0.) if recovering else ACTION_VW[action]
+        command = ACTION_VW[action] if velocity is None else velocity
+        linear, angular = (COLLISION_RECOVERY_SPEED, 0.) if recovering else command
         collision=False
         for _ in range(self.substeps):
             self.wheels=self.config.wheels_for_velocity(linear,angular,self.wheels,self.substep)

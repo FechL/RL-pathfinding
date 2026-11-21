@@ -333,18 +333,23 @@ def read_policy(path, navigation, algorithm='sac'):
     for key in ('format_version','algorithm','signature','config','observation_version'):
         if data.get(key) != expected[key]:
             raise ValueError(f'Incompatible continuous policy ({key}); retrain it')
+    return actor_from_layers(data, navigation.observation_size), data
+
+
+def actor_from_layers(data, observation_size):
+    """Build a NumPy inference function for an exported ReLU SAC actor."""
     layers = [(np.asarray(x['weight']),np.asarray(x['bias'])) for x in data['layers']]
-    if not layers or layers[0][0].shape[1] != navigation.observation_size or layers[-1][0].shape[0] != 2:
-        raise ValueError('Malformed continuous actor dimensions')
-    previous = navigation.observation_size
+    previous = observation_size
     for weight,bias in layers:
         if weight.ndim!=2 or weight.shape[1]!=previous or bias.shape!=(weight.shape[0],) or not np.all(np.isfinite(weight)) or not np.all(np.isfinite(bias)):
             raise ValueError('Malformed continuous actor layer')
         previous = weight.shape[0]
+    if not layers or previous != 2:
+        raise ValueError('Malformed continuous actor output')
     def actor(observation):
         x = np.asarray(observation)
         for index,(weight,bias) in enumerate(layers):
             x = weight@x+bias
             if index<len(layers)-1: x = np.maximum(x,0)
         return np.tanh(x)
-    return actor,data
+    return actor

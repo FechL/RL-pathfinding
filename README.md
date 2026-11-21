@@ -43,6 +43,38 @@ tersimpan di `reports/lidar_q_learning/runs/`. Latih ulang Q-table versi lama
 untuk lima sektor LiDAR depan (versi 9).
 Untuk latihan tanpa jendela, jalankan `bash run.sh train --no-render`.
 
+## DRL dengan SAC dan perbandingan yang setara
+
+Mode `drl` memakai Soft Actor-Critic dengan dua critic dan actor jaringan
+saraf. Actor menerima lima jarak LiDAR depan, jarak dan bearing kontinu ke
+target, kecepatan roda, serta penanda target aktif. Keluaran mengatur
+kecepatan maju dan laju putar kontinu. Pencarian LiDAR, DFS, batas gerak,
+reward, dan pemulihan tabrakan memakai aturan yang sama dengan versi tabular.
+Mode `sac` dan `naf` lama tetap tersedia sebagai eksperimen tersendiri.
+
+```bash
+bash run.sh train --algorithm drl --steps 100000 --render-speed 16
+bash run.sh sim --algorithm drl --fast
+bash run.sh compare \
+  --q-policy /path/ke/run-q/q_table.json \
+  --drl-policy /path/ke/run-drl/actor.json \
+  --routes /path/ke/run-q/routes.json
+```
+
+Training DRL menyimpan `actor.json`, checkpoint SAC, data episode dan loss,
+grafik, serta `summary.json` di `reports/lidar_drl/runs/`. Fase
+uji kecepatan dimulai setelah kuota langkah eksplorasi (default 60%)
+terpenuhi dan ada rute sukses. Tambahkan `--no-render` untuk training tanpa
+jendela. Pengendali Webots memuat actor JSON tanpa dependensi PyTorch.
+
+Perintah `compare` menguji kebijakan yang dibekukan dalam simulator kinematik.
+Keduanya mengikuti urutan target yang sama dari `routes.json` dengan tiga
+arah hadap awal dan timeout yang sama. File `trials.csv`, `summary.json`,
+dan `comparison.png` masuk ke `results/lidar_comparison/`. Median waktu
+tempuh hanya dihitung dari percobaan yang mencapai goal. Hasil ini mengukur
+kontrol gerak pada rute tetap. Pencarian rute dan fisika Webots perlu
+dievaluasi terpisah.
+
 ## Optional legacy continuous SAC
 
 Older continuous SAC modes remain available by selecting `hidden_goal`, `sac`

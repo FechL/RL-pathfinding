@@ -10,6 +10,7 @@ from uuid import uuid4
 import numpy as np
 
 from continuous_control import ControlConfig
+from lidar_drl import drive_command, load_actor, observation
 from lidar_q_env import (COLLISION_PENALTY, COLLISION_RECOVERY_SECONDS,
                          COLLISION_RECOVERY_SPEED)
 from lidar_qlearning import (ACTION_NAMES,ACTION_VW,TabularLidarQ,
@@ -19,18 +20,19 @@ from planner import physical_clearance,path_length
 from q_learning import ContinuousMaze,scene_signature
 
 
-def find_policy(project):
+def find_policy(project, drl=False):
     explicit=os.environ.get('MICROMOUSE_POLICY')
     if explicit:
         path=Path(explicit).expanduser()
         return path if path.is_absolute() else project/path
-    runs=sorted((project/'reports/lidar_q_learning/runs').glob('*/q_table.json'),reverse=True)
+    directory, filename = ('lidar_drl', 'actor.json') if drl else ('lidar_q_learning', 'q_table.json')
+    runs=sorted((project/'reports'/directory/'runs').glob(f'*/{filename}'),reverse=True)
     if runs:
         return runs[0]
-    return project/'models/lidar_q_table.json'
+    return project/'models'/('lidar_sac_actor.json' if drl else 'lidar_q_table.json')
 
 
-def run(supervisor):
+def run(supervisor, *, drl=False):
     from micromouse import MapView,PROJECT,read_scene
     timestep=int(supervisor.getBasicTimeStep())
     if timestep!=16:
@@ -41,13 +43,17 @@ def run(supervisor):
     start=tuple(position[:2])
     maze=ContinuousMaze(start,goal,walls,bounds,cell_size)
     signature=scene_signature(maze)
-    policy_path=find_policy(PROJECT)
+    policy_path=find_policy(PROJECT, drl)
     if not policy_path.is_file():
-        raise SystemExit('Q movement table not found. Run: bash run.sh train --algorithm q_learning')
+        algorithm = 'drl' if drl else 'q_learning'
+        raise SystemExit(f'Policy not found. Run: bash run.sh train --algorithm {algorithm}')
     try:
-        agent,metadata=TabularLidarQ.load(policy_path)
+        if drl:
+            actor, metadata = load_actor(policy_path)
+        else:
+            agent, metadata = TabularLidarQ.load(policy_path)
     except ValueError as error:
-        raise SystemExit(f'{error}. Train a movement-only Q-table before simulation.') from error
+        raise SystemExit(str(error)) from error
     training=metadata.get('training',{})
     if training.get('role') and 'continuous differential-drive motion' not in training['role']:
         raise ValueError('This Q table was not trained for robot motion; train the start-to-goal DFS/Q controller first.')
@@ -77,13 +83,15 @@ def run(supervisor):
     search = LidarMazeSearch(start, goal, bounds, cell_size, seed,
                              replay=best['targets'] if replay else ())
     show=os.environ.get('MICROMOUSE_NO_GUI')!='1' and (sys.platform!='linux' or bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')))
-    view=MapView(start,goal,walls,bounds,[],set(),cell_size,show,'LiDAR exploration + tabular Q motion')
+    label = 'LiDAR + SAC' if drl else 'LiDAR + tabular Q'
+    view=MapView(start,goal,walls,bounds,[],set(),cell_size,show,label)
     config=ControlConfig()
     decision_ticks=max(1,round(.16/(timestep/1000)))
     timeout_s=float(os.environ.get('MICROMOUSE_TIMEOUT_S','300'))
     max_ticks=math.ceil(timeout_s/(timestep/1000))
     commands=np.zeros(2,dtype=float)
     action=0
+    policy_velocity = ACTION_VW[action]
     recovery=WaypointRecovery()
     target = None
     exhausted = False
@@ -159,21 +167,29 @@ def run(supervisor):
             if target is None:
                 action = search.scan_action(sectors)
                 state = None
+                policy_velocity = ACTION_VW[action]
             else:
-                state=discretize_state(pose,target,sectors)
-                values=agent.values(state)
                 allowed=recovery.actions(pose,target,sectors,supervisor.getTime()-began)
-                action=max(allowed,key=lambda candidate:float(values[candidate]))
+                if drl:
+                    state = observation(pose,target,sectors,commands,config.wheel_limit)
+                    action, policy_velocity = drive_command(actor(state),sectors,allowed)
+                else:
+                    state=discretize_state(pose,target,sectors)
+                    values=agent.values(state)
+                    action=max(allowed,key=lambda candidate:float(values[candidate]))
+                    policy_velocity = ACTION_VW[action]
             policy_ticks=0
         if not recovering:
-            velocity = ACTION_VW[action]
+            velocity = policy_velocity
         commands=config.wheels_for_velocity(*velocity,commands,timestep/1000)
         for motor,speed in zip(motors,commands):motor.setVelocity(float(speed))
         telemetry.append(dict(time_s=supervisor.getTime()-began,pose=pose.tolist(),
                               search_path_index=len(search.route),target=list(target) if target is not None else None,
                               distance_to_waypoint_m=math.dist(point,target) if target is not None else None,distance_to_goal_m=goal_error,
-                              q_state=list(state) if state is not None else None,
-                              q_values=agent.values(state).tolist() if state is not None else None,
+                              q_state=list(state) if state is not None and not drl else None,
+                              observation=state.tolist() if state is not None and drl else None,
+                              q_values=agent.values(state).tolist() if state is not None and not drl else None,
+                              velocity_command=list(velocity),
                               scanning=target is None and not recovering,
                               action='Lepas dari tembok' if recovering else ACTION_NAMES[action],
                               action_index=None if recovering else action,
@@ -190,9 +206,10 @@ def run(supervisor):
     final_heading=float(imu.getRollPitchYaw()[2])
     if not trail or np.linalg.norm(final-trail[-1])>1e-9:trail.append(final.tolist())
     result=dict(status='success' if success else 'search_exhausted' if exhausted else 'timeout',
-                algorithm='online_lidar_dfs_with_tabular_q_motion',search_algorithm='online_lidar_dfs',
+                algorithm='online_lidar_dfs_with_sac_motion' if drl else 'online_lidar_dfs_with_tabular_q_motion',
+                search_algorithm='online_lidar_dfs',
                 search_mode='best_route' if replay else 'exploration', search_seed=seed,
-                policy=str(policy_path.resolve()),table_states=len(agent.q),
+                policy=str(policy_path.resolve()),table_states=None if drl else len(agent.q),
                 search_cells_visited=len(search.edges),search_path=search.route,goal=tuple(goal),start=start,
                 final_position=final.tolist(),goal_error_m=float(np.linalg.norm(final-np.asarray(goal))),
                 distance_from_base_m=float(np.linalg.norm(final-np.asarray(start))),

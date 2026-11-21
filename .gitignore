@@ -9,6 +9,7 @@ reports/continuous/runs/
 reports/continuous_hidden_goal/runs/
 reports/naf/runs/
 reports/naf/models/
+reports/lidar_drl/runs/
 reports/rl/runs/
 reports/rl/**/models/*.zip
 reports/rl/**/models/*.pkl

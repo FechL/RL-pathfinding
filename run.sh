@@ -20,6 +20,10 @@ case "$mode" in
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
                         ;;
+                    drl)
+                        shift 2
+                        exec "$training_python" "$project_dir/tools/train_lidar_drl.py" "$@"
+                        ;;
                     naf)
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_naf.py" --render --render-speed 1 "$@"
@@ -37,7 +41,7 @@ case "$mode" in
                         exec "$training_python" "$project_dir/tools/train_continuous.py" --warm-start --render "$@"
                         ;;
                     *)
-                        echo "Pilih algoritma training: q_learning, hidden_goal (atau rl), sac, guided_rl, naf." >&2
+                        echo "Pilih algoritma training: q_learning, drl, hidden_goal (atau rl), sac, guided_rl, naf." >&2
                         exit 2
                         ;;
                 esac
@@ -45,6 +49,10 @@ case "$mode" in
             exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
         fi
         exec "$training_python" "$project_dir/tools/plot_training.py" "$@"
+        ;;
+    compare)
+        shift
+        exec "$project_dir/.venv/bin/python" "$project_dir/tools/compare_lidar_policies.py" "$@"
         ;;
     help|--help|-h)
         echo "bash run.sh                  Jalankan robot di Webots"
@@ -55,6 +63,9 @@ case "$mode" in
         echo "bash run.sh train --steps 100000"
         echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal (legacy)"
         echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
+        echo "bash run.sh train --algorithm drl   Training SAC dengan pencarian LiDAR"
+        echo "bash run.sh sim --algorithm drl --fast  Simulasi hasil training DRL"
+        echo "bash run.sh compare --help          Bandingkan Q-learning dan DRL"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
         echo "bash run.sh sim --fast              Percepat simulasi Webots"
         echo "bash run.sh sim --best-route --fast Jalankan ulang rute tercepat yang tercatat"
@@ -76,7 +87,7 @@ case "$mode" in
                 --best-route) export MICROMOUSE_BEST_ROUTE=1; shift ;;
                 --algorithm)
                     case "${2:-}" in
-                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|astar)
+                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|drl|astar)
                             if [[ "$2" == "rl" ]]; then
                                 export MICROMOUSE_ALGORITHM=hidden_goal
                             else
@@ -84,7 +95,7 @@ case "$mode" in
                             fi
                             shift 2
                             ;;
-                        *) echo "Pilih algoritma simulasi: q_learning, hidden_goal (atau rl), naf, sac, rl_unguided, atau astar." >&2; exit 2 ;;
+                        *) echo "Pilih algoritma simulasi: q_learning, drl, hidden_goal (atau rl), naf, sac, rl_unguided, atau astar." >&2; exit 2 ;;
                     esac
                     ;;
                 --policy)
