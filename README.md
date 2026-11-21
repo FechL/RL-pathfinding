@@ -26,9 +26,21 @@ urutan pemilihan cabang yang sama.
 Episode berakhir saat goal tercapai, timeout, atau semua cabang yang terdeteksi
 sudah dicoba. Tabrakan memberi penalti `-100`. Robot mencoba mundur sebentar
 dengan pemeriksaan jarak aman simulator, lalu melanjutkan episode dan rute
-yang sama. Grafik reward dan tombol
-**BUKA Q-TABLE** tetap tersedia. Statistik episode tersimpan di
-`reports/lidar_q_learning/runs/`. Latih ulang Q-table untuk lima sektor LiDAR depan (versi 9).
+yang sama.
+
+Monitor training menampilkan **EKSPLORASI** saat robot mencari rute dari
+LiDAR. Setelah kuota eksplorasi (60% episode secara default) terpenuhi dan
+minimal satu rute sampai goal, training otomatis masuk **UJI KECEPATAN**.
+Robot bergantian mengulang rute yang ditemukan tanpa putaran kembali akibat
+eksplorasi. Semua uji mulai dari arah hadap yang sama. Q-learning masih
+memperbarui tabel dan eksplorasi aksi dikurangi. Waktu terbaik dihitung dari
+uji kecepatan yang sampai goal dan dicatat di `routes.json` dan `training.csv`
+dalam folder run. Jika belum ada rute yang berhasil, fase eksplorasi berlanjut.
+Gunakan `--exploration-fraction` untuk mengatur kuota.
+
+Grafik reward dan tombol **BUKA Q-TABLE** tetap tersedia. Statistik episode
+tersimpan di `reports/lidar_q_learning/runs/`. Latih ulang Q-table versi lama
+untuk lima sektor LiDAR depan (versi 9).
 Untuk latihan tanpa jendela, jalankan `bash run.sh train --no-render`.
 
 ## Optional legacy continuous SAC

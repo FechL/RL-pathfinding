@@ -184,6 +184,12 @@ class LidarQView:
         nose=self.pixel(env.pose[:2]+.15*np.array([math.cos(env.pose[2]),math.sin(env.pose[2])]))
         cv2.line(frame,point,nose,(38,40,47),2,cv2.LINE_AA)
         cv2.putText(frame,'TABULAR Q MOTION CONTROL + LIDAR 180',(18,29),cv2.FONT_HERSHEY_SIMPLEX,.52,(35,48,60),2,cv2.LINE_AA)
+        speed_test = env.training_phase == 'speed_test'
+        phase_label = 'UJI KECEPATAN' if speed_test else 'EKSPLORASI'
+        phase_color = (45, 135, 215) if speed_test else (145, 100, 40)
+        cv2.rectangle(frame, (18, 38), (187, 59), phase_color, -1)
+        cv2.putText(frame, phase_label, (26, 53), cv2.FONT_HERSHEY_SIMPLEX,
+                    .47, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(213,229,241),-1)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(112,143,165),1)
         cv2.putText(frame,'BUKA Q-TABLE  [T / Q]',(self.button[0]+18,37),cv2.FONT_HERSHEY_SIMPLEX,.43,(38,58,72),1,cv2.LINE_AA)
@@ -194,9 +200,12 @@ class LidarQView:
             mode = 'pindai cabang'
         else:
             mode = 'pemulihan' if env.recovery_active else 'normal'
+        route_label = f' | uji rute #{env.training_route_id}' if speed_test else ''
+        best_time = f'{env.best_speed_time:.2f}s' if env.best_speed_time is not None else 'belum ada'
         info=[f'Episode: {episode} | step total: {steps_total}',
               f'Langkah episode: {env.steps}/{env.max_steps}',
               f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}/{STATE_SPACE_SIZE:,}',
+              f'Rute ditemukan: {env.routes_found}{route_label} | terbaik: {best_time}',
               f'Reward akumulasi: {env.episode_return:+.2f}',
               f'Target lokal #{env.waypoint_index} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
