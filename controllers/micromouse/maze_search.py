@@ -1,61 +1,111 @@
-"""Depth-first search over open maze-cell connections."""
+"""Online depth-first exploration of a regular maze using local LiDAR."""
 import math
+import random
 
-from planner import segment_is_free
+import numpy as np
+
+from planner import ROBOT_RADIUS
+
+DIRECTIONS = ((1, 0), (0, 1), (-1, 0), (0, -1))
 
 
-def depth_first_path(start,goal,walls,bounds,cell_size):
-    """Try cell branches in order and backtrack until the goal cell is found."""
-    xmin,xmax,ymin,ymax=map(float,bounds)
-    cell_size=float(cell_size)
-    width=round((xmax-xmin)/cell_size)
-    height=round((ymax-ymin)/cell_size)
+def world_scan(pose, local_hits):
+    """Transform finite LiDAR hits from the robot frame to the GPS frame."""
+    hits = np.asarray(local_hits, dtype=float).reshape(-1, 2)
+    hits = hits[np.isfinite(hits).all(axis=1)]
+    c, s = math.cos(pose[2]), math.sin(pose[2])
+    return hits @ np.array([[c, s], [-s, c]]) + pose[:2]
 
-    def cell(point):
-        x=min(width-1,max(0,int(math.floor((point[0]-xmin)/cell_size))))
-        y=min(height-1,max(0,int(math.floor((point[1]-ymin)/cell_size))))
-        return y*width+x
 
-    def center(index):
-        return (xmin+(index%width+.5)*cell_size,
-                ymin+(index//width+.5)*cell_size)
+def synthetic_hits(ranges):
+    angles = -math.pi / 2 + np.arange(len(ranges)) * (2 * math.pi / len(ranges))
+    hit = ranges < 4.
+    return ranges[hit, None] * np.column_stack((np.cos(angles[hit]), np.sin(angles[hit])))
 
-    start_cell,goal_cell=cell(start),cell(goal)
-    graph=[[] for _ in range(width*height)]
-    directions=((1,0),(0,1),(-1,0),(0,-1))
-    for index in range(width*height):
-        x,y=index%width,index//width
-        for dx,dy in directions:
-            nx,ny=x+dx,y+dy
-            if not (0<=nx<width and 0<=ny<height):
-                continue
-            neighbor=ny*width+nx
-            if segment_is_free(center(index),center(neighbor),walls,bounds):
-                graph[index].append(neighbor)
 
-    parent={start_cell:None}
-    visited={start_cell}
-    stack=[(start_cell,iter(graph[start_cell]))]
-    while stack and goal_cell not in visited:
-        current,neighbors=stack[-1]
-        next_cell=next((candidate for candidate in neighbors if candidate not in visited),None)
-        if next_cell is None:
-            stack.pop()
-            continue
-        parent[next_cell]=current
-        visited.add(next_cell)
-        stack.append((next_cell,iter(graph[next_cell])))
+class LidarMazeSearch:
+    def __init__(self, start, goal, bounds, cell_size, seed=0, replay=()):
+        self.start = tuple(start)
+        self.goal = tuple(goal)
+        self.origin = np.array([bounds[0], bounds[2]])
+        self.size = cell_size
+        self.shape = (round((bounds[1] - bounds[0]) / cell_size),
+                      round((bounds[3] - bounds[2]) / cell_size))
+        self.rng = random.Random(seed)
+        self.stack = [self.cell(start)]
+        self.visited = set(self.stack)
+        self.edges = {}
+        self.route = []
+        self.replay = iter(replay)
+        self.replaying = bool(replay)
+        self.final = False
 
-    if goal_cell not in visited:
-        raise RuntimeError('DFS could not find a path from start to goal')
-    cells=[];current=goal_cell
-    while current is not None:
-        cells.append(current);current=parent[current]
-    cells.reverse()
-    path=[tuple(start)]+[center(index) for index in cells[1:-1]]+[tuple(goal)]
-    # Remove coincident endpoints when start and goal occupy the same cell.
-    compact=[]
-    for point in path:
-        if not compact or math.dist(compact[-1],point)>.01:
-            compact.append(point)
-    return compact,len(visited)
+    def cell(self, point):
+        return tuple(np.floor((point - self.origin) / self.size).astype(int))
+
+    def center(self, cell):
+        return self.origin + (np.asarray(cell) + .5) * self.size
+
+    @staticmethod
+    def clear_corridor(start, end, hits):
+        delta = end - start
+        length = np.linalg.norm(delta)
+        if length < 1e-9:
+            return True
+        along = delta / length
+        across = np.array([-along[1], along[0]])
+        offsets = hits - start
+        longitudinal = offsets @ along
+        lateral = np.abs(offsets @ across)
+        return not np.any((longitudinal >= 0) & (longitudinal <= length + .04)
+                          & (lateral <= ROBOT_RADIUS + .02))
+
+    def next_target(self, pose, local_hits):
+        """Observe a reached cell and choose one unvisited branch or backtrack."""
+        if self.replaying:
+            target = tuple(next(self.replay, self.goal))
+            self.final = target == self.goal
+            self.route.append(target)
+            return target
+
+        cell = self.stack[-1]
+        center = self.center(cell)
+        if not self.route and math.dist(pose[:2], center) > .055:
+            self.route.append(tuple(center))
+            return self.route[-1]
+
+        hits = world_scan(pose, local_hits)
+        if (math.dist(center, self.goal) <= .75 * self.size
+                and self.clear_corridor(pose[:2], np.asarray(self.goal), hits)):
+            self.final = True
+            self.route.append(self.goal)
+            return self.goal
+
+        if cell not in self.edges:
+            neighbors = []
+            for dx, dy in DIRECTIONS:
+                neighbor = (cell[0] + dx, cell[1] + dy)
+                if not all(0 <= index < limit for index, limit in zip(neighbor, self.shape)):
+                    continue
+                # Check through the shared boundary, stopping before the next
+                # cell's far wall. Side walls outside the robot's width are ignored.
+                probe = center + .69 * (self.center(neighbor) - center)
+                if self.clear_corridor(center, probe, hits):
+                    neighbors.append(neighbor)
+            self.edges[cell] = sorted(
+                neighbors,
+                key=lambda neighbor: math.dist(self.center(neighbor), self.goal)
+                + self.rng.uniform(0, 2.5 * self.size),
+            )
+
+        neighbor = next((n for n in self.edges[cell] if n not in self.visited), None)
+        if neighbor is not None:
+            self.stack.append(neighbor)
+            self.visited.add(neighbor)
+        elif len(self.stack) > 1:
+            self.stack.pop()
+        else:
+            return None
+        target = tuple(self.center(self.stack[-1]))
+        self.route.append(target)
+        return target

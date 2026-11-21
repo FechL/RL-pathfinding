@@ -57,6 +57,7 @@ case "$mode" in
         echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
         echo "bash run.sh sim --fast              Percepat simulasi Webots"
+        echo "bash run.sh sim --best-route --fast Jalankan ulang rute tercepat yang tercatat"
         echo "bash run.sh sim --policy path.json  Jalankan Q-table tertentu"
         echo "bash run.sh train --algorithm q_learning --timeout 300 --render-speed 16"
         echo "bash run.sh graphs           Buat grafik dari latihan tersimpan"
@@ -72,6 +73,7 @@ case "$mode" in
             case "$1" in
                 --fast) webots_mode=fast; shift ;;
                 --realtime) webots_mode=realtime; shift ;;
+                --best-route) export MICROMOUSE_BEST_ROUTE=1; shift ;;
                 --algorithm)
                     case "${2:-}" in
                         hidden_goal|rl|naf|sac|rl_unguided|q_learning|astar)

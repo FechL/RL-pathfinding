@@ -193,7 +193,7 @@ class LidarQView:
               f'Langkah episode: {env.steps}/{env.max_steps}',
               f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}/{STATE_SPACE_SIZE:,}',
               f'Reward akumulasi: {env.episode_return:+.2f}',
-              f'Waypoint {getattr(env,"waypoint_index",1)}/{getattr(env,"waypoint_count",1)} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
+              f'Target lokal #{env.waypoint_index} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
               f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)} | Mode: {"pemulihan" if env.recovery_active else "normal"}',
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',

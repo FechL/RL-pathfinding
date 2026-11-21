@@ -1,57 +1,32 @@
-# Micromouse DFS Search with Tabular Q-Learning Motion
+# Micromouse dengan eksplorasi LiDAR dan Q-learning
 
-The controller separates maze search from wheel motion. A depth-first search
-tries connected cell branches in order and backtracks when a branch ends. It
-uses the wall layout in the Webots world to build that cell graph, so this is
-map-based search rather than physical exploration with an unknown map. The
-robot follows the resulting cell-centre waypoints using a tabular Q policy; Q
-chooses differential-drive velocity and yaw-rate targets, not the maze route.
-DFS finds a route to the goal; it does not guarantee the shortest or fastest
-route.
-
-During movement, a 360° Webots LiDAR returns 128 ranges. The policy aggregates
-them into eight directional minima and uses six compact features (front,
-front-left, left, rear, right, front-right), along with the bearing and distance
-to the next cell centre. This gives at most 23,328 discrete states. A
-directional safety mask checks for 0.16 m of clearance for translation. The
-robot can pivot in place if all eight sectors clear its footprint. After two
-seconds without at least 2 cm of progress toward the waypoint, recovery
-restricts the available Q actions to help the robot face and approach it. The
-monitor shows when recovery is active.
-
-Each training episode runs continuously from the maze start, across all DFS
-waypoints, to the goal. It ends only at the goal, a collision, or the 300-second
-timeout. Heading is randomized at reset. The reward favors closing the
-distance and reducing the heading error to the current waypoint.
-Intermediate waypoints give `+4`,
-the mission goal gives `+120`, and a collision costs `-100`. Forward LiDAR
-clearance has 1.5× weight. Training displays the full robot run, LiDAR scan,
-reward graph and Q-table; Webots uses the physical LiDAR and GPS. Retrain
-older Q tables to include the pivot actions.
+Posisi start dan goal berasal dari world Webots. Robot memakai GPS dan IMU
+untuk mengenali posisi serta arah hadapnya. Dari setiap sel yang dicapai,
+LiDAR memeriksa bukaan ke sel tetangga. DFS memilih cabang yang belum dicoba,
+membuat target lokal, dan kembali ke sel sebelumnya saat cabang buntu.
+Layout tembok lengkap hanya dipakai untuk tampilan dan pemeriksaan tabrakan.
+Q-learning memilih aksi roda ke target lokal yang dibuat oleh pencarian.
 
 ```bash
-bash run.sh train                         # train Q motion control + live Q table
-bash run.sh train --algorithm q_learning --episodes 3000
-bash run.sh train --render-speed 16       # faster visible preview
-bash run.sh train --no-render             # train without the window
-bash run.sh sim                           # Webots with the newest saved Q table
-bash run.sh sim --algorithm q_learning --policy reports/lidar_q_learning/runs/<run>/q_table.json
-bash run.sh sim --fast                    # Webots simulation speed mode
-bash run.sh graphs                        # legacy SAC/NAF training graphs
+bash run.sh train --render-speed 16
+bash run.sh sim --fast
+bash run.sh sim --best-route --fast
 ```
 
-Click **BUKA Q-TABLE** or press `T`/`Q` during training to open the sparse
-state/action table. It pages through learned states, shows visits and Q values
-for each maneuver, and highlights the best safe action.
-The main window draws the LiDAR rays and shows reward, epsilon, target distance,
-current waypoint number, collision rate and sector ranges. `[` and `]` page through table rows; press
-`T` or `Q` again to close it.
+Jalankan simulasi biasa beberapa kali untuk mencoba urutan cabang berbeda.
+Setiap perjalanan yang sampai goal mencatat target yang benar-benar diikuti
+(termasuk langkah kembali bila ada) dan waktu simulasi. Mode
+`--best-route` memakai urutan target dari perjalanan sukses dengan waktu
+terendah untuk world dan Q-table yang sama. Catatan ada di `results/lidar_routes/`.
+Rute terpilih hanya dibandingkan dengan perjalanan yang sudah selesai diuji.
+Gunakan `MICROMOUSE_SEARCH_SEED=6 bash run.sh sim --fast` untuk mengulang
+urutan pemilihan cabang yang sama.
 
-Runs are stored under `reports/lidar_q_learning/runs/`; each run contains
-`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. Both
-training and evaluation measure full start-to-goal missions along the DFS
-route. The Q table is saved every ten episodes and when training exits, so it
-can be loaded with `--policy`.
+Training menjalankan pencarian dari start hingga goal, tabrakan, timeout,
+atau semua cabang yang terdeteksi sudah dicoba. Grafik reward dan tombol
+**BUKA Q-TABLE** tetap tersedia. Statistik episode tersimpan di
+`reports/lidar_q_learning/runs/`. Q-table versi 8 tetap kompatibel.
+Untuk latihan tanpa jendela, jalankan `bash run.sh train --no-render`.
 
 ## Optional legacy continuous SAC
 

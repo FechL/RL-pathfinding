@@ -22,7 +22,7 @@ from lidar_q_env import (COLLISION_PENALTY,FORWARD_LIDAR_WEIGHT,
 from lidar_qlearning import (ACTION_NAMES,STATE_SPACE_SIZE,TabularLidarQ,
                              WaypointRecovery)
 from q_learning import scene_signature
-from maze_search import depth_first_path
+from maze_search import LidarMazeSearch, synthetic_hits
 from train_q_learning import read_world
 
 
@@ -34,39 +34,40 @@ def epsilon_for_episode(episode,total,exploration_fraction):
     return max(.02,.08*(.02/.08)**progress)
 
 
-def run_episode(env,agent,route,goal,epsilon,heading,max_steps,*,learn,view=None,
-                episode=0,steps_offset=0):
-    start=tuple(route[0])
-    if len(route)<2:
-        route=[start,tuple(goal)]
-    waypoint_index=1
-    state=env.reset(start=start,goal=route[waypoint_index],heading=heading)
-    env.waypoint_index=waypoint_index
-    env.waypoint_count=len(route)-1
+def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
+                view=None, episode=0, steps_offset=0):
+    search = LidarMazeSearch(env.base_start, env.base_goal, env.nav.bounds,
+                             env.nav.cell_size, seed=seed)
+    env.reset(heading=heading)
+    target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
+    exhausted = target is None
+    state = env.last_state if exhausted else env.set_waypoint(target)
+    env.waypoint_index = len(search.route)
     total=0.;collision=False;success=False;updates=0;info={}
-    min_front=float('inf')
+    min_front = float(min(env.lidar_sectors[[7,0,1]]))
     recovery=WaypointRecovery()
     allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,0.)
-    for _ in range(max_steps):
+    for _ in range(0 if exhausted else max_steps):
         if learn:
             action=agent.choose(state,epsilon,allowed)
         else:
             values=agent.values(state)
             action=max(allowed,key=lambda a:float(values[a]))
-        final_goal=waypoint_index==len(route)-1
-        next_state,reward,terminated,truncated,info=env.step(action,final_goal=final_goal)
+        next_state,reward,terminated,truncated,info=env.step(action,final_goal=search.final)
         min_front=min(min_front,float(info['front_clearance_m']))
-        if info['waypoint_reached'] and not final_goal and not (terminated or truncated):
-            waypoint_index+=1
-            env.waypoint_index=waypoint_index
-            next_state=env.set_waypoint(route[waypoint_index])
-            recovery=WaypointRecovery()
+        if info['waypoint_reached'] and not (terminated or truncated):
+            target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
+            exhausted = target is None
+            if not exhausted:
+                env.waypoint_index = len(search.route)
+                next_state = env.set_waypoint(target)
+                recovery = WaypointRecovery()
         allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,
                                  env.steps*env.decision_seconds)
         env.recovery_active=recovery.active
         env.allowed_actions=allowed
         if learn:
-            agent.update(state,action,reward,next_state,terminated,
+            agent.update(state,action,reward,next_state,terminated or exhausted,
                          allowed)
         state=next_state;total+=reward;updates+=1
         if view and not view.update(env,agent,episode,epsilon,steps_offset+updates):
@@ -74,25 +75,26 @@ def run_episode(env,agent,route,goal,epsilon,heading,max_steps,*,learn,view=None
         if terminated:
             collision=bool(info['collision']);success=bool(info['success'])
             break
-        if truncated:
+        if truncated or exhausted:
             break
     result=dict(reward=total,steps=updates,success=success,collision=collision,
-                start=list(start),target=list(goal),
-                distance_to_goal_m=math.dist(env.pose[:2],goal),
+                start=env.base_start.tolist(),target=env.base_goal.tolist(),
+                distance_to_goal_m=math.dist(env.pose[:2],env.base_goal),
                 distance_from_base_m=float(info.get('distance_from_base_m',
                     math.hypot(env.pose[0]-env.base_start[0],
                                env.pose[1]-env.base_start[1]))),
                 travelled_distance_m=env.travelled_distance,
                 min_front_clearance_m=min_front,
-                waypoints=len(route)-1)
+                waypoints=len(search.route), search_exhausted=exhausted,
+                cells_visited=len(search.edges), duration_s=updates*env.decision_seconds)
     return result,updates
 
 
-def evaluate(env,agent,route,goal,runs=40,max_steps=120):
+def evaluate(env,agent,runs=40,max_steps=120):
     results=[]
     for index in range(runs):
         heading=((index%8)-3.5)*math.pi/4
-        result,_=run_episode(env,agent,route,goal,0.,heading,max_steps,learn=False)
+        result,_=run_episode(env,agent,0.,heading,max_steps,seed=index,learn=False)
         results.append(dict(seed=index,**result))
     return results
 
@@ -124,10 +126,6 @@ def main():
 
     maze=read_world()
     nav=NavigationMap(maze.start,maze.goal,maze.walls,maze.bounds,maze.cell_size,guided=False)
-    route,search_cells=depth_first_path(maze.start,maze.goal,maze.walls,
-                                        maze.bounds,maze.cell_size)
-    if len(route)<2:
-        route=[tuple(maze.start),tuple(maze.goal)]
     env=LidarQEnvironment(nav,timeout_seconds=args.timeout)
     if args.max_steps is not None:
         env.max_steps=min(env.max_steps,args.max_steps)
@@ -149,7 +147,7 @@ def main():
                   state_schema='relative bearing to next DFS waypoint 8 bins, waypoint distance 4 bins, six LiDAR sectors 3 bins',
                   state_space_upper_bound=STATE_SPACE_SIZE,
                   action_names=ACTION_NAMES,
-                  role='tabular Q-learning controls continuous differential-drive motion for a complete DFS route from maze start to goal',
+                  role='tabular Q-learning controls continuous differential-drive motion for an online LiDAR search from maze start to goal',
                   training_tasks='each episode begins at maze start and ends at maze goal, collision, or timeout; heading is randomized',
                   reward='4 x GPS next-waypoint progress + 0.20 x heading error reduction - time, travel, clearance and idle costs; +4 waypoint; +120 goal; -100 collision',
                   forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
@@ -158,9 +156,7 @@ def main():
                   recovery='after 2 seconds without a new 2 cm waypoint progress, guides allowed Q actions until the next waypoint',
                   collision_reward=COLLISION_PENALTY,goal_reward=GOAL_REWARD,
                   waypoint_reward=WAYPOINT_REWARD,maze_signature=signature,
-                  search_algorithm='depth_first_search',search_cells_visited=search_cells,
-                  route_waypoints=len(route)-1,route_length_m=sum(
-                      math.dist(route[i-1],route[i]) for i in range(1,len(route))))
+                  search_algorithm='online_lidar_dfs')
     (run_dir/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
     view=None
     if args.render:
@@ -170,7 +166,7 @@ def main():
     began=time.perf_counter();success_count=collision_count=0;first_success=None;total_steps=0
     episodes_completed=0
     fieldnames=('episode','phase','epsilon','reward','steps','success','collision',
-                'goal_distance_m','route_waypoints',
+                'goal_distance_m','route_waypoints','cells_visited','duration_s','search_exhausted',
                 'distance_from_base_m','travelled_distance_m','min_front_clearance_m',
                 'q_states','updates')
     try:
@@ -181,8 +177,8 @@ def main():
                 epsilon=epsilon_for_episode(episode,args.episodes,args.exploration_fraction)
                 phase='exploration' if episode<args.episodes*args.exploration_fraction else 'exploitation'
                 heading=rng.uniform(-math.pi,math.pi)
-                final_info,updates=run_episode(env,agent,route,maze.goal,epsilon,heading,
-                                               env.max_steps,learn=True,view=view,
+                final_info,updates=run_episode(env,agent,epsilon,heading,
+                                               env.max_steps,seed=episode,learn=True,view=view,
                                                episode=episode+1,steps_offset=total_steps)
                 total_steps+=updates
                 success=final_info['success'];collision=final_info['collision']
@@ -192,7 +188,8 @@ def main():
                     reward=final_info['reward'],steps=final_info['steps'],
                     success=success,collision=collision,
                     goal_distance_m=final_info['distance_to_goal_m'],
-                    route_waypoints=final_info['waypoints'],
+                    route_waypoints=final_info['waypoints'],cells_visited=final_info['cells_visited'],
+                    duration_s=final_info['duration_s'],search_exhausted=final_info['search_exhausted'],
                     distance_from_base_m=final_info['distance_from_base_m'],
                     travelled_distance_m=final_info['travelled_distance_m'],
                     min_front_clearance_m=final_info['min_front_clearance_m'],
@@ -211,7 +208,7 @@ def main():
                                'elapsed_training_s':time.perf_counter()-began})
         if view:view.close()
 
-    eval_results=evaluate(env,agent,route,maze.goal,args.evaluation_runs,env.max_steps)
+    eval_results=evaluate(env,agent,args.evaluation_runs,env.max_steps)
     summary=dict(**manifest,episodes_completed=episodes_completed,
                  first_success_episode=first_success,training_successes=success_count,
                  training_collisions=collision_count,q_states=len(agent.q),
