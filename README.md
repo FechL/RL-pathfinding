@@ -23,8 +23,10 @@ Rute terpilih hanya dibandingkan dengan perjalanan yang sudah selesai diuji.
 Gunakan `MICROMOUSE_SEARCH_SEED=6 bash run.sh sim --fast` untuk mengulang
 urutan pemilihan cabang yang sama.
 
-Training menjalankan pencarian dari start hingga goal, tabrakan, timeout,
-atau semua cabang yang terdeteksi sudah dicoba. Grafik reward dan tombol
+Episode berakhir saat goal tercapai, timeout, atau semua cabang yang terdeteksi
+sudah dicoba. Tabrakan memberi penalti `-100`. Robot mencoba mundur sebentar
+dengan pemeriksaan jarak aman simulator, lalu melanjutkan episode dan rute
+yang sama. Grafik reward dan tombol
 **BUKA Q-TABLE** tetap tersedia. Statistik episode tersimpan di
 `reports/lidar_q_learning/runs/`. Latih ulang Q-table untuk lima sektor LiDAR depan (versi 9).
 Untuk latihan tanpa jendela, jalankan `bash run.sh train --no-render`.

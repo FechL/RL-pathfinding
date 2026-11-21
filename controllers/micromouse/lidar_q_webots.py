@@ -10,6 +10,8 @@ from uuid import uuid4
 import numpy as np
 
 from continuous_control import ControlConfig
+from lidar_q_env import (COLLISION_PENALTY, COLLISION_RECOVERY_SECONDS,
+                         COLLISION_RECOVERY_SPEED)
 from lidar_qlearning import (ACTION_NAMES,ACTION_VW,TabularLidarQ,
                              WaypointRecovery,aggregate_point_cloud,discretize_state)
 from maze_search import LidarMazeSearch
@@ -86,7 +88,11 @@ def run(supervisor):
     target = None
     exhausted = False
     steps=0;policy_ticks=0
-    success=False;collision=False;timed_out=False
+    success=False;timed_out=False
+    collision_count = 0
+    contact_latched = False
+    recovery_until = 0.
+    state = None
     began=supervisor.getTime()
     trail=[];telemetry=[];clearance=float('inf')
     scan=lidar.getPointCloud();sectors=aggregate_point_cloud(scan)
@@ -99,20 +105,44 @@ def run(supervisor):
         physical=physical_clearance(point,walls,bounds)
         clearance=min(clearance,physical)
         goal_error=float(np.linalg.norm(np.asarray(goal)-point))
-        if physical<-.002:
-            collision=True
-            break
-        if search.final and goal_error<=.09:
+        elapsed = supervisor.getTime() - began
+        collision_event = False
+        recovering = elapsed < recovery_until
+        if not recovering and physical >= .003:
+            contact_latched = False
+        if not recovering and recovery_until:
+            recovery_until = 0.
+            policy_ticks = decision_ticks
+        if physical < -.002 and not recovering:
+            collision_event = not contact_latched
+            collision_count += int(collision_event)
+            contact_latched = True
+            recovery_until = elapsed + COLLISION_RECOVERY_SECONDS
+            recovering = True
+            recovery.active = True
+        if not recovering and search.final and goal_error<=.09:
             success=True
             break
-        if supervisor.getTime()-began>=timeout_s or steps>=max_ticks:
+        if elapsed>=timeout_s or steps>=max_ticks:
             timed_out=True
             break
 
         needs_target = target is None or (
             not search.final and math.dist(point, target) <= .055
         )
-        if steps == 0 or policy_ticks >= decision_ticks or (needs_target and target is not None):
+        if recovering:
+            if policy_ticks >= decision_ticks:
+                scan = lidar.getPointCloud()
+                sectors = aggregate_point_cloud(scan)
+                policy_ticks = 0
+            state = None
+            # Check the retreat against the simulator's collision geometry.
+            # The policy's inputs remain the forward LiDAR and GPS-derived state.
+            rear = point - .035 * np.array([math.cos(pose[2]), math.sin(pose[2])])
+            rear_clearance = physical_clearance(rear, walls, bounds)
+            safe_retreat = rear_clearance >= min(0., physical) - .001
+            velocity = (COLLISION_RECOVERY_SPEED if safe_retreat else 0., 0.)
+        elif steps == 0 or policy_ticks >= decision_ticks or (needs_target and target is not None):
             scan = lidar.getPointCloud()
             if needs_target:
                 target = search.next_target(pose, [(hit.x, hit.y) for hit in scan])
@@ -135,15 +165,19 @@ def run(supervisor):
                 allowed=recovery.actions(pose,target,sectors,supervisor.getTime()-began)
                 action=max(allowed,key=lambda candidate:float(values[candidate]))
             policy_ticks=0
-        commands=config.wheels_for_velocity(*ACTION_VW[action],commands,timestep/1000)
+        if not recovering:
+            velocity = ACTION_VW[action]
+        commands=config.wheels_for_velocity(*velocity,commands,timestep/1000)
         for motor,speed in zip(motors,commands):motor.setVelocity(float(speed))
         telemetry.append(dict(time_s=supervisor.getTime()-began,pose=pose.tolist(),
                               search_path_index=len(search.route),target=list(target) if target is not None else None,
                               distance_to_waypoint_m=math.dist(point,target) if target is not None else None,distance_to_goal_m=goal_error,
                               q_state=list(state) if state is not None else None,
                               q_values=agent.values(state).tolist() if state is not None else None,
-                              scanning=target is None,
-                              action=ACTION_NAMES[action],action_index=action,
+                              scanning=target is None and not recovering,
+                              action='Lepas dari tembok' if recovering else ACTION_NAMES[action],
+                              action_index=None if recovering else action,
+                              collision_event=collision_event, collision_recovery=recovering,
                               waypoint_recovery=target is not None and recovery.active,
                               lidar_sector_min_m=sectors.tolist(),lidar_points=len(scan),
                               commanded_wheels=commands.tolist(),clearance_m=physical))
@@ -155,7 +189,7 @@ def run(supervisor):
     final=np.array(gps.getValues()[:2])
     final_heading=float(imu.getRollPitchYaw()[2])
     if not trail or np.linalg.norm(final-trail[-1])>1e-9:trail.append(final.tolist())
-    result=dict(status='success' if success else 'collision' if collision else 'search_exhausted' if exhausted else 'timeout',
+    result=dict(status='success' if success else 'search_exhausted' if exhausted else 'timeout',
                 algorithm='online_lidar_dfs_with_tabular_q_motion',search_algorithm='online_lidar_dfs',
                 search_mode='best_route' if replay else 'exploration', search_seed=seed,
                 policy=str(policy_path.resolve()),table_states=len(agent.q),
@@ -165,6 +199,8 @@ def run(supervisor):
                 simulation_duration_s=supervisor.getTime()-began,movement_steps=steps,
                 travelled_length_m=path_length(trail),target_path_length_m=path_length([start,*search.route]),
                 min_physical_clearance_m=clearance,trajectory=trail,telemetry=telemetry,
+                collision_count=collision_count, collision=collision_count>0,
+                collision_penalty_total=collision_count*COLLISION_PENALTY,
                 timeout=timed_out)
     output.mkdir(parents=True,exist_ok=True)
     if success and search.route and search.final:

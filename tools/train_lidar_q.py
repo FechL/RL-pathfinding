@@ -20,7 +20,7 @@ from lidar_q_env import (COLLISION_PENALTY,FORWARD_LIDAR_WEIGHT,
                          WAYPOINT_REWARD,
                          LidarQEnvironment)
 from lidar_qlearning import (ACTION_NAMES,STATE_SPACE_SIZE,TabularLidarQ,
-                             WaypointRecovery)
+                             STOP_ACTION,WaypointRecovery)
 from q_learning import scene_signature
 from maze_search import LidarMazeSearch, synthetic_hits
 from train_q_learning import read_world
@@ -43,13 +43,17 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
     exhausted = target is None and search.scan_bearing is None
     state = env.last_state if target is None else env.set_waypoint(target)
     env.waypoint_index = len(search.route)
-    total=0.;collision=False;success=False;updates=0;info={}
+    total=0.;success=False;updates=0;info={}
+    collision_count = 0
     min_front = float(min(env.lidar_sectors[[4,0,1]]))
     recovery=WaypointRecovery()
     allowed = recovery.actions(env.pose,env.goal,env.lidar_sectors,0.)
     for _ in range(0 if exhausted else max_steps):
         scanning = target is None
-        if scanning:
+        recovering = env.collision_recovery
+        if recovering:
+            action = STOP_ACTION
+        elif scanning:
             action = search.scan_action(env.lidar_sectors)
         elif learn:
             action=agent.choose(state,epsilon,allowed)
@@ -57,8 +61,11 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
             values=agent.values(state)
             action=max(allowed,key=lambda a:float(values[a]))
         next_state,reward,terminated,truncated,info=env.step(action,final_goal=search.final,scanning=scanning)
+        if info['collision']:
+            collision_count += 1
+            recovery.active = True
         min_front=min(min_front,float(info['front_clearance_m']))
-        if (scanning or info['waypoint_reached']) and not (terminated or truncated):
+        if ((scanning and not recovering and not info['collision']) or info['waypoint_reached']) and not (terminated or truncated):
             target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
             exhausted = target is None and search.scan_bearing is None
             if target is not None:
@@ -68,20 +75,23 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
         allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,
                                  env.steps*env.decision_seconds)
         env.scanning = scanning
+        env.recovering_from_collision = recovering
+        env.collision_count = collision_count
         env.recovery_active=recovery.active
         env.allowed_actions = (search.scan_action(env.lidar_sectors),) if target is None and not exhausted else allowed
-        if learn and not scanning:
+        if learn and not scanning and not recovering:
             agent.update(state,action,reward,next_state,terminated or target is None,
                          allowed)
         state=next_state;total+=reward;updates+=1
         if view and not view.update(env,agent,episode,epsilon,steps_offset+updates):
             raise KeyboardInterrupt
         if terminated:
-            collision=bool(info['collision']);success=bool(info['success'])
+            success=bool(info['success'])
             break
         if truncated or exhausted:
             break
-    result=dict(reward=total,steps=updates,success=success,collision=collision,
+    result=dict(reward=total,steps=updates,success=success,collision=collision_count>0,
+                collision_count=collision_count,
                 start=env.base_start.tolist(),target=env.base_goal.tolist(),
                 distance_to_goal_m=math.dist(env.pose[:2],env.base_goal),
                 distance_from_base_m=float(info.get('distance_from_base_m',
@@ -152,12 +162,13 @@ def main():
                   state_space_upper_bound=STATE_SPACE_SIZE,
                   action_names=ACTION_NAMES,
                   role='tabular Q-learning controls continuous differential-drive motion for an online LiDAR search from maze start to goal',
-                  training_tasks='each episode begins at maze start and ends at maze goal, collision, or timeout; heading is randomized',
+                  training_tasks='start-to-goal search with randomized initial heading; episodes end at goal, timeout, or exhausted search',
                   reward='4 x GPS next-waypoint progress + 0.20 x heading error reduction - time, travel, clearance and idle costs; +4 waypoint; +120 goal; -100 collision',
                   forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
                   gps_travel_cost_per_meter=GPS_TRAVEL_COST_PER_METER,
                   lidar_safety_mask='0.16 m directional clearance for translation; footprint clearance for pivots',
                   recovery='after 2 seconds without a new 2 cm waypoint progress, guides allowed Q actions until the next waypoint',
+                  collision_recovery='contact incurs the penalty and triggers a brief supervised retreat within the same episode',
                   collision_reward=COLLISION_PENALTY,goal_reward=GOAL_REWARD,
                   waypoint_reward=WAYPOINT_REWARD,maze_signature=signature,
                   search_algorithm='online_lidar_dfs')
@@ -169,7 +180,7 @@ def main():
 
     began=time.perf_counter();success_count=collision_count=0;first_success=None;total_steps=0
     episodes_completed=0
-    fieldnames=('episode','phase','epsilon','reward','steps','success','collision',
+    fieldnames=('episode','phase','epsilon','reward','steps','success','collision','collision_count',
                 'goal_distance_m','route_waypoints','cells_visited','duration_s','search_exhausted',
                 'distance_from_base_m','travelled_distance_m','min_front_clearance_m',
                 'q_states','updates')
@@ -191,6 +202,7 @@ def main():
                 writer.writerow(dict(episode=episode+1,phase=phase,epsilon=epsilon,
                     reward=final_info['reward'],steps=final_info['steps'],
                     success=success,collision=collision,
+                    collision_count=final_info['collision_count'],
                     goal_distance_m=final_info['distance_to_goal_m'],
                     route_waypoints=final_info['waypoints'],cells_visited=final_info['cells_visited'],
                     duration_s=final_info['duration_s'],search_exhausted=final_info['search_exhausted'],

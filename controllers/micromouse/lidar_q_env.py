@@ -10,6 +10,8 @@ from planner import ROBOT_RADIUS, SAFETY_MARGIN
 FORWARD_LIDAR_WEIGHT=1.5
 GPS_TRAVEL_COST_PER_METER=.5
 COLLISION_PENALTY=-100.
+COLLISION_RECOVERY_SECONDS = .8
+COLLISION_RECOVERY_SPEED = -.09
 GOAL_REWARD=120.
 WAYPOINT_REWARD=4.
 WAYPOINT_TOLERANCE=.055
@@ -43,6 +45,12 @@ class LidarQEnvironment:
         self.last_success=False
         self.last_reward_parts={}
         self.last_state=None
+        self.recovery_until_step = 0
+        self.recovery_steps = math.ceil(COLLISION_RECOVERY_SECONDS / self.decision_seconds)
+
+    @property
+    def collision_recovery(self):
+        return self.steps < self.recovery_until_step
 
     def reset(self, start=None, goal=None, heading=0.):
         self.start=self.base_start.copy() if start is None else np.asarray(start,dtype=float)
@@ -61,6 +69,7 @@ class LidarQEnvironment:
         self.last_collision=False
         self.last_success=False
         self.last_reward_parts={}
+        self.recovery_until_step = 0
         self.last_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
         return self.last_state
 
@@ -81,7 +90,8 @@ class LidarQEnvironment:
         old_bearing=abs(waypoint_bearing(self.pose,self.goal))
         old_position=self.pose[:2].copy()
         old_distance=float(np.linalg.norm(self.goal-self.pose[:2]))
-        linear,angular=ACTION_VW[action]
+        recovering = self.collision_recovery
+        linear, angular = (COLLISION_RECOVERY_SPEED, 0.) if recovering else ACTION_VW[action]
         collision=False
         for _ in range(self.substeps):
             self.wheels=self.config.wheels_for_velocity(linear,angular,self.wheels,self.substep)
@@ -92,16 +102,20 @@ class LidarQEnvironment:
                 break
             self.pose=candidate
         self.steps+=1
+        collision_event = collision and not recovering
+        if collision_event:
+            self.recovery_until_step = self.steps + self.recovery_steps
         self.lidar_scan=self.nav.lidar_scan(self.pose)
         self.lidar_sectors=aggregate_lidar(self.lidar_scan)
         travelled_delta=float(np.linalg.norm(self.pose[:2]-old_position))
         self.travelled_distance+=travelled_delta
         distance_from_base=float(np.linalg.norm(self.pose[:2]-self.base_start))
         new_distance=float(np.linalg.norm(self.goal-self.pose[:2]))
-        waypoint_reached=not scanning and not collision and new_distance<=(GOAL_TOLERANCE if final_goal else WAYPOINT_TOLERANCE)
+        forced_motion = scanning or recovering
+        waypoint_reached=not forced_motion and not collision and new_distance<=(GOAL_TOLERANCE if final_goal else WAYPOINT_TOLERANCE)
         success=bool(waypoint_reached and final_goal)
         waypoint_reward=WAYPOINT_REWARD if waypoint_reached and not final_goal else 0.
-        progress_reward=0. if scanning else 4.*(old_distance-new_distance)
+        progress_reward=0. if forced_motion else 4.*(old_distance-new_distance)
         time_cost=-.025
         gps_travel_cost=-GPS_TRAVEL_COST_PER_METER*travelled_delta
         frontal_clearance=float(np.min(self.lidar_sectors[[4,0,1]]))
@@ -117,21 +131,21 @@ class LidarQEnvironment:
         close_wall_penalty=-.45*lidar_weight*float(
             np.clip((.24-maneuver_clearance)/.24,0.,1.))
         alignment_gain=old_bearing-abs(waypoint_bearing(self.pose,self.goal))
-        alignment_reward=0. if scanning else .20*alignment_gain
-        collision_penalty=COLLISION_PENALTY if collision else 0.
+        alignment_reward=0. if forced_motion else .20*alignment_gain
+        collision_penalty=COLLISION_PENALTY if collision_event else 0.
         goal_reward=GOAL_REWARD if success else 0.
-        stalled_penalty=-.10 if not scanning and travelled_delta<.002 and alignment_gain<.05 else 0.
+        stalled_penalty=-.10 if not forced_motion and travelled_delta<.002 and alignment_gain<.05 else 0.
         reward=(progress_reward+time_cost+gps_travel_cost+close_wall_penalty+
                 collision_penalty+goal_reward+stalled_penalty+alignment_reward)
         reward+=waypoint_reward
-        terminal=bool(collision or success)
+        terminal=success
         truncated=bool(self.steps>=self.max_steps and not terminal)
         next_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
         self.last_state=next_state
         self.previous_action=action
         self.episode_return+=reward
         self.finished=terminal or truncated
-        self.last_collision=collision
+        self.last_collision=collision_event
         self.last_success=success
         self.last_reward_parts=dict(progress=progress_reward,time=time_cost,
                                     gps_travel=gps_travel_cost,
@@ -140,11 +154,13 @@ class LidarQEnvironment:
                                     stalled=stalled_penalty,
                                     alignment=alignment_reward,lidar_weight=lidar_weight,
                                     maneuver_clearance=maneuver_clearance)
-        info=dict(collision=collision,success=success,waypoint_reached=waypoint_reached,
+        info=dict(collision=collision_event,collision_recovery=recovering,
+                  success=success,waypoint_reached=waypoint_reached,
                   distance_to_goal_m=new_distance,
                   distance_from_base_m=distance_from_base,
                   travelled_distance_m=self.travelled_distance,
-                  front_clearance_m=frontal_clearance,action=ACTION_NAMES[action],
+                  front_clearance_m=frontal_clearance,
+                  action='Lepas dari tembok' if recovering else ACTION_NAMES[action],
                   maneuver_clearance_m=maneuver_clearance,lidar_weight=lidar_weight,
                   reward_parts=self.last_reward_parts.copy())
         return next_state,float(reward),terminal,truncated,info

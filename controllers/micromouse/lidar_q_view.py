@@ -188,13 +188,19 @@ class LidarQView:
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(112,143,165),1)
         cv2.putText(frame,'BUKA Q-TABLE  [T / Q]',(self.button[0]+18,37),cv2.FONT_HERSHEY_SIMPLEX,.43,(38,58,72),1,cv2.LINE_AA)
         x=self.size+20;y=85
+        if env.recovering_from_collision:
+            mode = 'lepas dari tembok'
+        elif env.scanning:
+            mode = 'pindai cabang'
+        else:
+            mode = 'pemulihan' if env.recovery_active else 'normal'
         info=[f'Episode: {episode} | step total: {steps_total}',
               f'Langkah episode: {env.steps}/{env.max_steps}',
               f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}/{STATE_SPACE_SIZE:,}',
               f'Reward akumulasi: {env.episode_return:+.2f}',
               f'Target lokal #{env.waypoint_index} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
-              f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)} | Mode: {"pindai cabang" if env.scanning else "pemulihan" if env.recovery_active else "normal"}',
+              f'Mode: {mode} | Tabrakan episode: {env.collision_count}',
               'Sektor: D, DK, K, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
