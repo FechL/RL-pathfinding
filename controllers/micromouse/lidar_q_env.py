@@ -1,4 +1,4 @@
-"""Continuous differential-drive surrogate controlled by discrete Q actions."""
+"""Continuous differential-drive surrogate for full-route Q-learning."""
 import math
 
 import numpy as np
@@ -10,14 +10,17 @@ FORWARD_LIDAR_WEIGHT=1.5
 GPS_TRAVEL_COST_PER_METER=.5
 COLLISION_PENALTY=-100.
 GOAL_REWARD=120.
+WAYPOINT_REWARD=4.
+WAYPOINT_TOLERANCE=.055
+GOAL_TOLERANCE=.09
 
 
 class LidarQEnvironment:
-    def __init__(self, navigation, *, decision_seconds=.16, timeout_seconds=120.):
+    def __init__(self, navigation, *, decision_seconds=.16, timeout_seconds=300.):
         self.nav=navigation
         self.config=navigation.config
-        # Keep the maze's mission base/goal fixed while training on many
-        # local cell-to-cell waypoint tasks.
+        # Keep the mission base/goal fixed while the controller retargets
+        # successive DFS waypoints within one start-to-goal episode.
         self.base_start=np.asarray(navigation.start,dtype=float).copy()
         self.base_goal=np.asarray(navigation.goal,dtype=float).copy()
         self.start=self.base_start.copy()
@@ -62,7 +65,15 @@ class LidarQEnvironment:
         self.last_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
         return self.last_state
 
-    def step(self, action):
+    def set_waypoint(self, goal):
+        """Retarget the next route waypoint without resetting robot motion."""
+        if self.finished:
+            raise RuntimeError('Cannot change waypoints after an episode ends')
+        self.goal=np.asarray(goal,dtype=float)
+        self.last_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
+        return self.last_state
+
+    def step(self, action, *, final_goal=True):
         if self.finished:
             raise RuntimeError('Reset before beginning another episode')
         if not 0<=int(action)<len(ACTION_NAMES):
@@ -89,7 +100,9 @@ class LidarQEnvironment:
         self.travelled_distance+=travelled_delta
         distance_from_base=float(np.linalg.norm(self.pose[:2]-self.base_start))
         new_distance=float(np.linalg.norm(self.goal-self.pose[:2]))
-        success=new_distance<=.055
+        waypoint_reached=new_distance<=(GOAL_TOLERANCE if final_goal else WAYPOINT_TOLERANCE)
+        success=bool(waypoint_reached and final_goal)
+        waypoint_reward=WAYPOINT_REWARD if waypoint_reached and not final_goal else 0.
         progress_reward=4.*(old_distance-new_distance)
         time_cost=-.025
         gps_travel_cost=-GPS_TRAVEL_COST_PER_METER*travelled_delta
@@ -115,6 +128,7 @@ class LidarQEnvironment:
         self.last_position=self.pose[:2].copy()
         reward=(progress_reward+time_cost+gps_travel_cost+close_wall_penalty+
                 collision_penalty+goal_reward+stalled_penalty+spinning_penalty)
+        reward+=waypoint_reward
         terminal=bool(collision or success)
         truncated=bool(self.steps>=self.max_steps and not terminal)
         next_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
@@ -127,10 +141,12 @@ class LidarQEnvironment:
         self.last_reward_parts=dict(progress=progress_reward,time=time_cost,
                                     gps_travel=gps_travel_cost,
                                     close_wall=close_wall_penalty,collision=collision_penalty,
-                                    goal=goal_reward,stalled=stalled_penalty,
+                                    goal=goal_reward,waypoint=waypoint_reward,
+                                    stalled=stalled_penalty,
                                     spinning=spinning_penalty,lidar_weight=lidar_weight,
                                     maneuver_clearance=maneuver_clearance)
-        info=dict(collision=collision,success=success,distance_to_goal_m=new_distance,
+        info=dict(collision=collision,success=success,waypoint_reached=waypoint_reached,
+                  distance_to_goal_m=new_distance,
                   distance_from_base_m=distance_from_base,
                   travelled_distance_m=self.travelled_distance,
                   front_clearance_m=frontal_clearance,action=ACTION_NAMES[action],

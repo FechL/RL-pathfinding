@@ -193,20 +193,20 @@ class LidarQView:
               f'Langkah episode: {env.steps}/{env.max_steps}',
               f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}/{STATE_SPACE_SIZE:,}',
               f'Reward akumulasi: {env.episode_return:+.2f}',
-              f'Target sel berikutnya {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | dari base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
+              f'Waypoint {getattr(env,"waypoint_index",1)}/{getattr(env,"waypoint_count",1)} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
               f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)}',
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
               f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | waypoint {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | wall {env.last_reward_parts.get("close_wall",0):+.2f}',
-              f'Tabrakan -100 | waypoint +120 | timeout {env.max_steps*env.decision_seconds:.0f}s',
+              f'Tabrakan -100 | waypoint +4 | goal +120 | timeout {env.max_steps*env.decision_seconds:.0f}s',
               f'Sukses 100 ep: {100*sum(self.successes)/max(1,len(self.successes)):.1f}%',
               f'Tabrakan 100 ep: {100*sum(self.collisions)/max(1,len(self.collisions)):.1f}%']
         for i,text in enumerate(info):
             cv2.putText(frame,text,(x,y+i*23),cv2.FONT_HERSHEY_SIMPLEX,.34,(56,67,78),1,cv2.LINE_AA)
-        self._chart(frame,(x,y+300,self.panel-40,160),'Reward 100 episode terakhir',list(self.rewards))
-        self._chart(frame,(x,y+477,self.panel-40,160),'Q-value state sekarang',agent.values(env.last_state).tolist())
+        self._chart(frame,(x,y+325,self.panel-40,150),'Reward 100 episode terakhir',list(self.rewards))
+        self._chart(frame,(x,y+500,self.panel-40,150),'Q-value state sekarang',agent.values(env.last_state).tolist())
         return frame
 
     def _chart(self,frame,box,title,values):

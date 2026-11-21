@@ -49,8 +49,8 @@ def run(supervisor):
     trained_signature=training.get('maze_signature')
     if trained_signature and trained_signature!=signature:
         raise ValueError('The Q table was trained for a different maze. Train this world first.')
-    if training.get('role') and 'next-cell waypoint' not in training['role']:
-        raise ValueError('This Q table controls the full route, not waypoint motion; train the DFS/Q hybrid first.')
+    if training.get('role') and 'continuous differential-drive motion' not in training['role']:
+        raise ValueError('This Q table was not trained for robot motion; train the start-to-goal DFS/Q controller first.')
 
     gps=supervisor.getDevice('gps');gps.enable(timestep)
     imu=supervisor.getDevice('imu');imu.enable(timestep)

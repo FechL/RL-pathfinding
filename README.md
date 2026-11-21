@@ -4,9 +4,10 @@ The controller separates maze search from wheel motion. A depth-first search
 tries connected cell branches in order and backtracks when a branch ends. It
 uses the wall layout in the Webots world to build that cell graph, so this is
 map-based search rather than physical exploration with an unknown map. The
-robot then drives each cell-to-cell segment using a tabular Q policy; Q chooses
-differential-drive velocity and yaw-rate targets, not the maze route. DFS finds
-a route to the goal; it does not guarantee the shortest or fastest route.
+robot follows the resulting cell-centre waypoints using a tabular Q policy; Q
+chooses differential-drive velocity and yaw-rate targets, not the maze route.
+DFS finds a route to the goal; it does not guarantee the shortest or fastest
+route.
 
 During movement, a 360° Webots LiDAR returns 128 ranges. The policy aggregates
 them into eight directional minima and uses six compact features (front,
@@ -16,13 +17,13 @@ directional safety mask checks front plus the turning-side LiDAR sector for
 arcs and turns, and blocks a maneuver near a wall under 0.16 m. A stop is used
 only when every movement direction is blocked.
 
-Q is trained on short neighboring-cell waypoint tasks with random starting
-headings. A wall contact ends the task. GPS-equivalent progress toward the
-current waypoint and accumulated distance travelled shape the reward. Forward
-LiDAR clearance has 1.5× weight, collision costs `-100`, and reaching a
-waypoint gives `+120`.
-Training displays the robot moving to its waypoint, the LiDAR scan and the
-Q-table; the Webots run displays the DFS route and uses the physical LiDAR/GPS.
+Each training episode runs continuously from the maze start, across all DFS
+waypoints, to the goal. It ends only at the goal, a collision, or the 300-second
+timeout. Heading is randomized at reset. Progress toward the current waypoint
+and total distance travelled shape reward; intermediate waypoints give `+4`,
+the mission goal gives `+120`, and a collision costs `-100`. Forward LiDAR
+clearance has 1.5× weight. Training displays the full robot run, LiDAR scan,
+reward graph and Q-table; Webots uses the physical LiDAR and GPS.
 
 ```bash
 bash run.sh train                         # train Q motion control + live Q table
@@ -36,17 +37,17 @@ bash run.sh graphs                        # legacy SAC/NAF training graphs
 ```
 
 Click **BUKA Q-TABLE** or press `T`/`Q` during training to open the sparse
-state/action table. It pages through learned waypoint-motion states, shows
-visits and Q values for each maneuver, and highlights the best safe action.
+state/action table. It pages through learned states, shows visits and Q values
+for each maneuver, and highlights the best safe action.
 The main window draws the LiDAR rays and shows reward, epsilon, target distance,
-collision rate and sector ranges. `[` and `]` page through table rows; press
+current waypoint number, collision rate and sector ranges. `[` and `]` page through table rows; press
 `T` or `Q` again to close it.
 
 Runs are stored under `reports/lidar_q_learning/runs/`; each run contains
-`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. Training
-evaluations measure success at adjacent-cell motion tasks; Webots then combines
-that learned movement policy with DFS route search. The Q table is saved every
-ten episodes and when training exits, so it can be loaded with `--policy`.
+`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. Both
+training and evaluation measure full start-to-goal missions along the DFS
+route. The Q table is saved every ten episodes and when training exits, so it
+can be loaded with `--policy`.
 
 ## Optional legacy continuous SAC
 

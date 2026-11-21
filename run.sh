@@ -58,7 +58,7 @@ case "$mode" in
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
         echo "bash run.sh sim --fast              Percepat simulasi Webots"
         echo "bash run.sh sim --policy path.json  Jalankan Q-table tertentu"
-        echo "bash run.sh train --algorithm q_learning --timeout 120 --render-speed 16"
+        echo "bash run.sh train --algorithm q_learning --timeout 300 --render-speed 16"
         echo "bash run.sh graphs           Buat grafik dari latihan tersimpan"
         echo "bash run.sh graphs --report-dir /path/ke/run"
         exit 0

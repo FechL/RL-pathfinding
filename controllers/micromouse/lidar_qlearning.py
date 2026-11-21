@@ -15,7 +15,7 @@ LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
 LIDAR_STATE_SECTORS = (0,1,2,4,6,7)
 SAFE_DISTANCE = .16
-STATE_VERSION = 6
+STATE_VERSION = 7
 STATE_SPACE_SIZE = 8*4*(3**len(LIDAR_STATE_SECTORS))
 
 
