@@ -5,7 +5,7 @@ from collections import deque
 
 import numpy as np
 
-from lidar_qlearning import ACTION_NAMES, LIDAR_SECTORS, safe_actions
+from lidar_qlearning import ACTION_NAMES, LIDAR_SECTORS, SAFE_DISTANCE, safe_actions
 
 
 class LidarQView:
@@ -141,7 +141,7 @@ class LidarQView:
             cv2.line(frame,(x,yy+37),(self.width-20,yy+37),(220,225,229),1)
             cx=x
             state_label=self._state_text(state)
-            representative_ranges=np.asarray((.10,.30,.50),dtype=float)[list(state[2:10])]
+            representative_ranges=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[2:10])]
             valid_actions=safe_actions(representative_ranges)
             best_action=valid_actions[int(np.argmax(values[list(valid_actions)]))]
             for col,(label,width) in enumerate(columns):
@@ -192,7 +192,7 @@ class LidarQView:
               f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)}',
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
-              f'Front clearance: {float(np.min(env.lidar_sectors[[7,0,1]])):.2f} m',
+              f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
               f'Reward: progres {env.last_reward_parts.get("progress",0):+.2f} | dinding {env.last_reward_parts.get("close_wall",0):+.2f} | spin {env.last_reward_parts.get("spinning",0):+.2f}',
               f'Tabrakan -30 | goal +60 | timeout {env.max_steps*self.decision_seconds if hasattr(self,"decision_seconds") else env.max_steps*.16:.0f}s',
               f'Sukses 100 ep: {100*sum(self.successes)/max(1,len(self.successes)):.1f}%',

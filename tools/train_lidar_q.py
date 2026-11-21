@@ -93,7 +93,7 @@ def main():
                   state_schema='relative goal bearing 16 bins; goal distance 7 bins; eight lidar ranges each 3 bins; previous action',
                   action_names=ACTION_NAMES,goal_input='known goal coordinates and relative bearing/distance',
                   reward='8 x goal-distance progress - 0.025 per decision - near-wall penalty - low-progress spin penalty; +60 goal; -30 collision',
-                  lidar_safety_mask='blocks forward actions when front sector is under 0.18 m; falls back to stop if no adjacent direction is clear',
+                  lidar_safety_mask='blocks only actions whose forward, diagonal, or rear sector is under 0.12 m; stop is a fallback only when no movement is safe',
                   collision_reward=-30.,goal_reward=60.,maze_signature=signature)
     (run_dir/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
     view=None

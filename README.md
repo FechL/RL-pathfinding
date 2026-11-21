@@ -7,9 +7,9 @@ those readings into eight sector minimums (front, front-left, left, rear-left,
 rear, rear-right, right, front-right). Each sector becomes one of three
 distance bins for a sparse Q-table. The state also includes 16 bins of relative
 goal bearing, seven goal-distance bins, and the previous action. Seven smooth
-forward/arc/turn/reverse/stop actions provide continuous wheel targets. A
-LiDAR safety mask blocks forward turns when the front is too close and stops
-the robot if no direction has enough clearance.
+forward/arc/turn/reverse/stop actions provide smooth wheel targets. A LiDAR
+safety mask checks each maneuver's travel direction at 0.12 m and only allows
+the stop fallback when no movement direction is clear.
 
 Reward encourages progress toward the known goal and strongly penalizes wall
 collisions (`-30`); reaching the goal gives `+60`. Near-wall clearance and

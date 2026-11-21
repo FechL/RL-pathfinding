@@ -13,22 +13,27 @@ ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
              (.12, 2.7), (.12, -2.7), (-.11, 0.), (0., 0.))
 LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
-STATE_VERSION = 2
+SAFE_DISTANCE = .12
+STATE_VERSION = 3
 
 
 def safe_actions(lidar_sectors):
-    """Keep forward actions out of a very near obstacle using the lidar scan."""
+    """Mask only maneuvers whose travel direction is blocked by the scan.
+
+    Each sector is already the minimum over a 45-degree wedge. Requiring three
+    adjacent wedges to be clear was too conservative and could deadlock the
+    robot at ordinary maze corners. Stop is an emergency fallback only.
+    """
     sectors=np.asarray(lidar_sectors,dtype=float)
-    front=float(np.min(sectors[[7,0,1]]))
-    if front>=.18:
-        return tuple(range(len(ACTION_NAMES)))
     allowed=[]
-    if float(np.min(sectors[[3,4,5]]))>.18:
-        allowed.append(5)
-    if float(np.min(sectors[[1,2,3]]))>.18:
+    if sectors[0]>=SAFE_DISTANCE:
+        allowed.append(0)
+    if sectors[1]>=SAFE_DISTANCE:
         allowed.extend((1,3))
-    if float(np.min(sectors[[5,6,7]]))>.18:
+    if sectors[7]>=SAFE_DISTANCE:
         allowed.extend((2,4))
+    if sectors[4]>=SAFE_DISTANCE:
+        allowed.append(5)
     return tuple(allowed) if allowed else (6,)
 
 
@@ -70,7 +75,7 @@ def discretize_state(pose, goal, lidar_sectors, previous_action=None):
     bearing = (math.atan2(delta[1], delta[0])-pose[2]+math.pi)%(2*math.pi)-math.pi
     bearing_bin = min(15, int((bearing+math.pi)/(2*math.pi/16)))
     distance_bin = int(np.digitize(distance, [.15, .35, .7, 1.2, 2., 3.5]))
-    lidar_bins = tuple(int(x) for x in np.digitize(np.asarray(lidar_sectors), [.18, .45]))
+    lidar_bins = tuple(int(x) for x in np.digitize(np.asarray(lidar_sectors), [SAFE_DISTANCE, .45]))
     last_action = len(ACTION_NAMES) if previous_action is None else int(previous_action)
     return (bearing_bin, distance_bin, *lidar_bins, last_action)
 
@@ -149,7 +154,7 @@ class TabularLidarQ:
                      state=('relative goal bearing 16 bins, goal distance 7 bins, '
                             '8 lidar sector minimums quantized to 3 levels, previous action'),
                      lidar_sector_order=LIDAR_SECTORS,
-                     lidar_bins={'near_m':.18,'medium_m':.45,'maximum_range_m':4.},
+                     lidar_bins={'near_m':SAFE_DISTANCE,'medium_m':.45,'maximum_range_m':4.},
                      actions=[dict(name=name,linear_m_s=vw[0],yaw_rad_s=vw[1])
                               for name,vw in zip(ACTION_NAMES,ACTION_VW)],
                      rows={key:[float(value) for value in values]
@@ -167,7 +172,7 @@ class TabularLidarQ:
     def load(cls, path, seed=0):
         payload=json.loads(Path(path).read_text())
         if payload.get('format_version')!=STATE_VERSION or payload.get('algorithm')!='tabular_q_lidar':
-            raise ValueError('Not a compatible lidar tabular Q-learning table')
+            raise ValueError('This LiDAR Q-table uses an older state schema; retrain with `bash run.sh train` before simulation')
         if tuple(item['name'] for item in payload['actions'])!=ACTION_NAMES:
             raise ValueError('Q-table action schema does not match this robot')
         agent=cls(payload['alpha'],payload['gamma'],seed)
