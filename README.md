@@ -1,33 +1,32 @@
-# Micromouse Tabular Q-Learning with LiDAR
+# Micromouse DFS Search with Tabular Q-Learning Motion
 
-The default learner is **tabular Q-learning**. The robot uses GPS position and
-the goal coordinates, but receives no route or map path to follow.
-A 360° Webots LiDAR produces 128 range returns; the controller aggregates
-those readings into eight sector minimums (front, front-left, left, rear-left,
-rear, rear-right, right, front-right). Each sector becomes one of three
-distance bins for a sparse Q-table. The state also includes the GPS maze-cell,
-16 bins of relative goal bearing, seven goal-distance bins, and the previous action. Seven smooth
-forward/arc/turn/reverse/stop actions provide smooth wheel targets. A LiDAR
-safety mask checks each maneuver's travel direction at 0.16 m and only allows
-the stop fallback when no movement direction is clear.
+The controller separates maze search from wheel motion. A depth-first search
+tries connected cell branches in order and backtracks when a branch ends. It
+uses the wall layout in the Webots world to build that cell graph, so this is
+map-based search rather than physical exploration with an unknown map. The
+robot then drives each cell-to-cell segment using a tabular Q policy; Q chooses
+differential-drive velocity and yaw-rate targets, not the maze route. DFS finds
+a route to the goal; it does not guarantee the shortest or fastest route.
 
-Reward uses GPS goal-distance progress and strongly penalizes wall
-collisions (`-100`); reaching the goal gives `+120`. First entry to a grid cell
-earns a small exploration bonus, while revisiting a cell costs reward. The
-forward/diagonal-forward
-LiDAR clearance penalty has 1.5× weight compared with reverse, and turning
-without goal progress also carries a penalty. GPS travel distance adds a small
-per-metre cost to discourage long loops; the monitor shows both distance from
-the start/base and total path travelled.
-Reward is accumulated over each
-episode, and Q-learning bootstraps with `gamma=0.995`. Training alternates an
-exploration phase with a lower-epsilon exploitation phase. The kinematic
-training simulator uses the same maze geometry and synthetic 360° scan; the
-Webots simulation reads its physical LiDAR.
+During movement, a 360° Webots LiDAR returns 128 ranges. The policy aggregates
+them into eight directional minima and uses six compact features (front,
+front-left, left, rear, right, front-right), along with the bearing and distance
+to the next cell centre. This gives at most 23,328 discrete states. A
+directional safety mask checks front plus the turning-side LiDAR sector for
+arcs and turns, and blocks a maneuver near a wall under 0.16 m. A stop is used
+only when every movement direction is blocked.
+
+Q is trained on short neighboring-cell waypoint tasks with random starting
+headings. A wall contact ends the task. GPS-equivalent progress toward the
+current waypoint and accumulated distance travelled shape the reward. Forward
+LiDAR clearance has 1.5× weight, collision costs `-100`, and reaching a
+waypoint gives `+120`.
+Training displays the robot moving to its waypoint, the LiDAR scan and the
+Q-table; the Webots run displays the DFS route and uses the physical LiDAR/GPS.
 
 ```bash
-bash run.sh train                         # LiDAR Q-learning + live Q table
-bash run.sh train --algorithm q_learning --episodes 1500
+bash run.sh train                         # train Q motion control + live Q table
+bash run.sh train --algorithm q_learning --episodes 3000
 bash run.sh train --render-speed 16       # faster visible preview
 bash run.sh train --no-render             # train without the window
 bash run.sh sim                           # Webots with the newest saved Q table
@@ -37,18 +36,17 @@ bash run.sh graphs                        # legacy SAC/NAF training graphs
 ```
 
 Click **BUKA Q-TABLE** or press `T`/`Q` during training to open the sparse
-state/action table. It pages through every discretized state learned so far,
-shows visits and Q values for each maneuver, and highlights the best safe
-action. The main
-window draws the LiDAR rays: green is clear, amber is farther than 0.35 m,
-and red is near a wall. The window also shows episode reward, epsilon,
-success/collision rates, goal distance and eight sector ranges. `[` and `]`
-page through table rows; press `T` or `Q` again to close it.
+state/action table. It pages through learned waypoint-motion states, shows
+visits and Q values for each maneuver, and highlights the best safe action.
+The main window draws the LiDAR rays and shows reward, epsilon, target distance,
+collision rate and sector ranges. `[` and `]` page through table rows; press
+`T` or `Q` again to close it.
 
 Runs are stored under `reports/lidar_q_learning/runs/`; each run contains
-`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. The Q
-table is saved every ten episodes and when training exits, so it can be loaded
-directly by Webots using `--policy`.
+`training.csv`, `q_table.json`, `evaluations.json` and `summary.json`. Training
+evaluations measure success at adjacent-cell motion tasks; Webots then combines
+that learned movement policy with DFS route search. The Q table is saved every
+ten episodes and when training exits, so it can be loaded with `--policy`.
 
 ## Optional legacy continuous SAC
 

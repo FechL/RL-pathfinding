@@ -13,24 +13,26 @@ ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
              (.12, 2.7), (.12, -2.7), (-.11, 0.), (0., 0.))
 LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
+LIDAR_STATE_SECTORS = (0,1,2,4,6,7)
 SAFE_DISTANCE = .16
-STATE_VERSION = 5
+STATE_VERSION = 6
+STATE_SPACE_SIZE = 8*4*(3**len(LIDAR_STATE_SECTORS))
 
 
 def safe_actions(lidar_sectors):
     """Mask only maneuvers whose travel direction is blocked by the scan.
 
-    Each sector is already the minimum over a 45-degree wedge. Requiring three
-    adjacent wedges to be clear was too conservative and could deadlock the
-    robot at ordinary maze corners. Stop is an emergency fallback only.
+    Each sector is already the minimum over a 45-degree wedge. A forward arc
+    checks both its front and turning-side wedges, matching the swept motion
+    better than checking only where the arc ends. Stop is an emergency fallback.
     """
     sectors=np.asarray(lidar_sectors,dtype=float)
     allowed=[]
     if sectors[0]>=SAFE_DISTANCE:
         allowed.append(0)
-    if sectors[1]>=SAFE_DISTANCE:
+    if sectors[0]>=SAFE_DISTANCE and sectors[1]>=SAFE_DISTANCE:
         allowed.extend((1,3))
-    if sectors[7]>=SAFE_DISTANCE:
+    if sectors[0]>=SAFE_DISTANCE and sectors[7]>=SAFE_DISTANCE:
         allowed.extend((2,4))
     if sectors[4]>=SAFE_DISTANCE:
         allowed.append(5)
@@ -66,28 +68,18 @@ def aggregate_point_cloud(points, maximum=4.):
     return np.clip(minima,0.,maximum).astype(np.float32)
 
 
-def gps_cell(position, bounds, cell_size):
-    """Quantize GPS coordinates to the maze's regular cell grid."""
-    xmin,xmax,ymin,ymax=map(float,bounds)
-    width=max(1,round((xmax-xmin)/float(cell_size)))
-    height=max(1,round((ymax-ymin)/float(cell_size)))
-    x=min(width-1,max(0,int(math.floor((float(position[0])-xmin)/cell_size))))
-    y=min(height-1,max(0,int(math.floor((float(position[1])-ymin)/cell_size))))
-    return x,y
-
-
-def discretize_state(pose, goal, lidar_sectors, previous_action=None, *, position_cell):
-    """Create a compact state from GPS cell, goal-relative data and LiDAR."""
+def discretize_state(pose, goal, lidar_sectors):
+    """State for driving one searched maze-cell segment with LiDAR."""
     pose = np.asarray(pose, dtype=float)
     goal = np.asarray(goal, dtype=float)
     delta = goal-pose[:2]
     distance = float(np.linalg.norm(delta))
     bearing = (math.atan2(delta[1], delta[0])-pose[2]+math.pi)%(2*math.pi)-math.pi
-    bearing_bin = min(15, int((bearing+math.pi)/(2*math.pi/16)))
-    distance_bin = int(np.digitize(distance, [.15, .35, .7, 1.2, 2., 3.5]))
-    lidar_bins = tuple(int(x) for x in np.digitize(np.asarray(lidar_sectors), [SAFE_DISTANCE, .45]))
-    last_action = len(ACTION_NAMES) if previous_action is None else int(previous_action)
-    return (*map(int,position_cell), bearing_bin, distance_bin, *lidar_bins, last_action)
+    bearing_bin = min(7, int((bearing+math.pi)/(2*math.pi/8)))
+    distance_bin = int(np.digitize(distance, [.10,.25,.50]))
+    selected=np.asarray(lidar_sectors,dtype=float)[list(LIDAR_STATE_SECTORS)]
+    lidar_bins = tuple(int(x) for x in np.digitize(selected, [SAFE_DISTANCE, .45]))
+    return (bearing_bin,distance_bin,*lidar_bins)
 
 
 class TabularLidarQ:
@@ -161,9 +153,11 @@ class TabularLidarQ:
     def save(self, path, metadata=None):
         payload=dict(format_version=STATE_VERSION, algorithm='tabular_q_lidar',
                      alpha=self.alpha, gamma=self.gamma,
-                     state=('GPS maze-cell x/y, relative goal bearing 16 bins, goal distance 7 bins, '
-                            '8 lidar sector minimums quantized to 3 levels, previous action'),
+                     state=('next-waypoint relative bearing 8 bins, waypoint distance 4 bins, '
+                            'six directional lidar minimums quantized to 3 levels'),
+                     state_space_upper_bound=STATE_SPACE_SIZE,
                      lidar_sector_order=LIDAR_SECTORS,
+                     lidar_state_sectors=[LIDAR_SECTORS[i] for i in LIDAR_STATE_SECTORS],
                      lidar_bins={'near_m':SAFE_DISTANCE,'medium_m':.45,'maximum_range_m':4.},
                      actions=[dict(name=name,linear_m_s=vw[0],yaw_rad_s=vw[1])
                               for name,vw in zip(ACTION_NAMES,ACTION_VW)],

@@ -5,7 +5,8 @@ from collections import deque
 
 import numpy as np
 
-from lidar_qlearning import ACTION_NAMES, LIDAR_SECTORS, SAFE_DISTANCE, safe_actions
+from lidar_qlearning import (ACTION_NAMES,LIDAR_SECTORS,LIDAR_STATE_SECTORS,
+                             SAFE_DISTANCE,STATE_SPACE_SIZE,safe_actions)
 
 
 class LidarQView:
@@ -84,10 +85,8 @@ class LidarQView:
 
     @staticmethod
     def _state_text(state):
-        x_cell,y_cell,bearing,distance,*rest=state
-        lidar=rest[:8]
-        last=rest[8]
-        return f"p{x_cell},{y_cell} b{bearing:02d} d{distance} | {''.join(map(str,lidar))} | a{last}"
+        bearing,distance,*lidar=state
+        return f"b{bearing:02d} d{distance} | {''.join(map(str,lidar))}"
 
     def _draw_table(self,agent,current_state):
         cv2=self.cv2
@@ -98,9 +97,9 @@ class LidarQView:
                 self.table_keys.append(key)
             self.table_synced_size=len(agent.state_order)
         frame=np.full((self.height,self.width,3),249,dtype=np.uint8)
-        cv2.putText(frame,'Q-table: GPS grid + goal-relative + 8 sektor LiDAR',
+        cv2.putText(frame,'Q-table: target-relative + 6 sektor LiDAR',
                     (24,36),cv2.FONT_HERSHEY_SIMPLEX,.62,(36,48,60),2,cv2.LINE_AA)
-        cv2.putText(frame,f'{len(agent.q):,} state tersimpan | state sekarang: {self._state_text(current_state)}',
+        cv2.putText(frame,f'{len(agent.q):,}/{STATE_SPACE_SIZE:,} state tersimpan | sekarang: {self._state_text(current_state)}',
                     (24,64),cv2.FONT_HERSHEY_SIMPLEX,.39,(65,76,87),1,cv2.LINE_AA)
         cv2.rectangle(frame,(self.width-268,17),(self.width-150,49),(224,232,239),-1)
         cv2.rectangle(frame,(self.width-140,17),(self.width-20,49),(210,228,239),-1)
@@ -141,7 +140,9 @@ class LidarQView:
             cv2.line(frame,(x,yy+37),(self.width-20,yy+37),(220,225,229),1)
             cx=x
             state_label=self._state_text(state)
-            representative_ranges=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[4:12])]
+            representative_ranges=np.full(8,.50,dtype=float)
+            bins=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[2:])]
+            representative_ranges[list(LIDAR_STATE_SECTORS)]=bins
             valid_actions=safe_actions(representative_ranges)
             best_action=valid_actions[int(np.argmax(values[list(valid_actions)]))]
             for col,(label,width) in enumerate(columns):
@@ -177,25 +178,29 @@ class LidarQView:
         point=self.pixel(env.pose[:2]);self.trail.append(point)
         if len(self.trail)>1:cv2.polylines(frame,[np.asarray(self.trail,dtype=np.int32)],False,(185,119,54),2)
         cv2.circle(frame,point,9,(57,77,224),-1,cv2.LINE_AA)
+        cv2.circle(frame,self.pixel(env.base_start),6,(60,160,90),-1,cv2.LINE_AA)
+        target=self.pixel(env.goal)
+        cv2.circle(frame,target,8,(205,105,30),2,cv2.LINE_AA)
+        cv2.line(frame,point,target,(112,153,190),1,cv2.LINE_AA)
         nose=self.pixel(env.pose[:2]+.15*np.array([math.cos(env.pose[2]),math.sin(env.pose[2])]))
         cv2.line(frame,point,nose,(38,40,47),2,cv2.LINE_AA)
-        cv2.putText(frame,'TABULAR Q-LEARNING + LIDAR 360°',(18,29),cv2.FONT_HERSHEY_SIMPLEX,.55,(35,48,60),2,cv2.LINE_AA)
+        cv2.putText(frame,'TABULAR Q MOTION CONTROL + LIDAR',(18,29),cv2.FONT_HERSHEY_SIMPLEX,.52,(35,48,60),2,cv2.LINE_AA)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(213,229,241),-1)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(112,143,165),1)
         cv2.putText(frame,'BUKA Q-TABLE  [T / Q]',(self.button[0]+18,37),cv2.FONT_HERSHEY_SIMPLEX,.43,(38,58,72),1,cv2.LINE_AA)
         x=self.size+20;y=85
         info=[f'Episode: {episode} | step total: {steps_total}',
               f'Langkah episode: {env.steps}/{env.max_steps}',
-              f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}',
+              f'Epsilon: {epsilon:.3f} | state Q: {len(agent.q):,}/{STATE_SPACE_SIZE:,}',
               f'Reward akumulasi: {env.episode_return:+.2f}',
-              f'Goal {np.linalg.norm(self.nav.goal-env.pose[:2]):.2f}m | dari base {np.linalg.norm(env.pose[:2]-self.nav.start):.2f}m',
+              f'Target sel berikutnya {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | dari base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
               f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)}',
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
-              f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | goal {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | cell {env.last_reward_parts.get("cell_exploration",0):+.1f}',
-              f'Tabrakan -100 | goal +120 | timeout {env.max_steps*env.decision_seconds:.0f}s',
+              f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | waypoint {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | wall {env.last_reward_parts.get("close_wall",0):+.2f}',
+              f'Tabrakan -100 | waypoint +120 | timeout {env.max_steps*env.decision_seconds:.0f}s',
               f'Sukses 100 ep: {100*sum(self.successes)/max(1,len(self.successes)):.1f}%',
               f'Tabrakan 100 ep: {100*sum(self.collisions)/max(1,len(self.collisions)):.1f}%']
         for i,text in enumerate(info):
