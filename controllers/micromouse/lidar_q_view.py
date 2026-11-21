@@ -88,7 +88,7 @@ class LidarQView:
         bearing,distance,*lidar=state
         return f"b{bearing:02d} d{distance} | {''.join(map(str,lidar))}"
 
-    def _draw_table(self,agent,current_state):
+    def _draw_table(self,agent,current_state,current_actions):
         cv2=self.cv2
         if len(agent.state_order)>self.table_synced_size:
             new_keys=agent.state_order[self.table_synced_size:]
@@ -106,7 +106,7 @@ class LidarQView:
         cv2.putText(frame,'< sebelumnya',(self.width-258,39),cv2.FONT_HERSHEY_SIMPLEX,.34,(40,52,64),1,cv2.LINE_AA)
         cv2.putText(frame,'berikutnya >',(self.width-130,39),cv2.FONT_HERSHEY_SIMPLEX,.34,(40,52,64),1,cv2.LINE_AA)
         columns=[('State',265),('Maju',128),('Ar kiri',128),('Ar kanan',128),
-                 ('Kiri',128),('Kanan',128),('Mundur',128),('Stop',128),('N',58)]
+                 ('Putar kiri',128),('Putar kanan',128),('Mundur',128),('Stop',128),('N',58)]
         x=20;y=108
         cv2.rectangle(frame,(x,y),(self.width-20,y+34),(44,67,86),-1)
         cx=x
@@ -143,7 +143,7 @@ class LidarQView:
             representative_ranges=np.full(8,.50,dtype=float)
             bins=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[2:])]
             representative_ranges[list(LIDAR_STATE_SECTORS)]=bins
-            valid_actions=safe_actions(representative_ranges)
+            valid_actions=current_actions if is_current else safe_actions(representative_ranges)
             best_action=valid_actions[int(np.argmax(values[list(valid_actions)]))]
             for col,(label,width) in enumerate(columns):
                 if col==0:text=('AKTIF | '+state_label) if is_current else state_label
@@ -195,7 +195,7 @@ class LidarQView:
               f'Reward akumulasi: {env.episode_return:+.2f}',
               f'Waypoint {getattr(env,"waypoint_index",1)}/{getattr(env,"waypoint_count",1)} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
-              f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)}',
+              f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)} | Mode: {"pemulihan" if env.recovery_active else "normal"}',
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
@@ -237,7 +237,7 @@ class LidarQView:
                 cv2.resizeWindow(self.table_title,self.width,self.height)
                 cv2.setMouseCallback(self.table_title,self._table_mouse)
                 self.table_window_open=True
-            self.cv2.imshow(self.table_title,self._draw_table(agent,env.last_state))
+            self.cv2.imshow(self.table_title,self._draw_table(agent,env.last_state,env.allowed_actions))
         key=self.cv2.waitKey(1)&255
         if key in (ord('t'),ord('q')):
             self.show_table=not self.show_table

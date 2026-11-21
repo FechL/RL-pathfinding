@@ -9,7 +9,7 @@ import numpy as np
 
 from continuous_control import ControlConfig
 from lidar_qlearning import (ACTION_NAMES,ACTION_VW,TabularLidarQ,
-                             aggregate_point_cloud,discretize_state,safe_actions)
+                             WaypointRecovery,aggregate_point_cloud,discretize_state)
 from maze_search import depth_first_path
 from planner import physical_clearance,path_length
 from q_learning import ContinuousMaze,scene_signature
@@ -65,10 +65,11 @@ def run(supervisor):
     view=MapView(start,goal,walls,bounds,path,set(),cell_size,show,'DFS search + tabular Q motion')
     config=ControlConfig()
     decision_ticks=max(1,round(.16/(timestep/1000)))
-    timeout_s=float(os.environ.get('MICROMOUSE_TIMEOUT_S','180'))
+    timeout_s=float(os.environ.get('MICROMOUSE_TIMEOUT_S','300'))
     max_ticks=math.ceil(timeout_s/(timestep/1000))
     commands=np.zeros(2,dtype=float)
     action=0
+    recovery=WaypointRecovery()
     target_index=1 if len(path)>1 else 0
     steps=0;policy_ticks=0
     success=False;collision=False;timed_out=False
@@ -97,6 +98,8 @@ def run(supervisor):
         target_error=float(np.linalg.norm(target-point))
         if target_error<=.055 and target_index<len(path)-1:
             target_index+=1
+            recovery=WaypointRecovery()
+            policy_ticks=0
             target=np.asarray(path[target_index],dtype=float)
             target_error=float(np.linalg.norm(target-point))
 
@@ -105,7 +108,7 @@ def run(supervisor):
             sectors=aggregate_point_cloud(scan)
             state=discretize_state(pose,target,sectors)
             values=agent.values(state)
-            allowed=safe_actions(sectors)
+            allowed=recovery.actions(pose,target,sectors,supervisor.getTime()-began)
             action=max(allowed,key=lambda candidate:float(values[candidate]))
             policy_ticks=0
         commands=config.wheels_for_velocity(*ACTION_VW[action],commands,timestep/1000)
@@ -115,6 +118,7 @@ def run(supervisor):
                               distance_to_waypoint_m=target_error,distance_to_goal_m=goal_error,
                               q_state=list(state),q_values=agent.values(state).tolist(),
                               action=ACTION_NAMES[action],action_index=action,
+                              waypoint_recovery=recovery.active,
                               lidar_sector_min_m=sectors.tolist(),lidar_points=len(scan),
                               commanded_wheels=commands.tolist(),clearance_m=physical))
         steps+=1;policy_ticks+=1
@@ -143,3 +147,5 @@ def run(supervisor):
         view.save(output/'map.png')
         view.close()
     print('MICROMOUSE_RESULT: '+json.dumps(result,sort_keys=True),flush=True)
+    if os.environ.get('MICROMOUSE_TEST_EXIT')=='1':
+        supervisor.simulationQuit(0)

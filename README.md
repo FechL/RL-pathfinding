@@ -13,17 +13,21 @@ During movement, a 360° Webots LiDAR returns 128 ranges. The policy aggregates
 them into eight directional minima and uses six compact features (front,
 front-left, left, rear, right, front-right), along with the bearing and distance
 to the next cell centre. This gives at most 23,328 discrete states. A
-directional safety mask checks front plus the turning-side LiDAR sector for
-arcs and turns, and blocks a maneuver near a wall under 0.16 m. A stop is used
-only when every movement direction is blocked.
+directional safety mask checks for 0.16 m of clearance for translation. The
+robot can pivot in place if all eight sectors clear its footprint. After two
+seconds without at least 2 cm of progress toward the waypoint, recovery
+restricts the available Q actions to help the robot face and approach it. The
+monitor shows when recovery is active.
 
 Each training episode runs continuously from the maze start, across all DFS
 waypoints, to the goal. It ends only at the goal, a collision, or the 300-second
-timeout. Heading is randomized at reset. Progress toward the current waypoint
-and total distance travelled shape reward; intermediate waypoints give `+4`,
+timeout. Heading is randomized at reset. The reward favors closing the
+distance and reducing the heading error to the current waypoint.
+Intermediate waypoints give `+4`,
 the mission goal gives `+120`, and a collision costs `-100`. Forward LiDAR
 clearance has 1.5× weight. Training displays the full robot run, LiDAR scan,
-reward graph and Q-table; Webots uses the physical LiDAR and GPS.
+reward graph and Q-table; Webots uses the physical LiDAR and GPS. Retrain
+older Q tables to include the pivot actions.
 
 ```bash
 bash run.sh train                         # train Q motion control + live Q table

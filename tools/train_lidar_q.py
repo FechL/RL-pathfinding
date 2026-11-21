@@ -20,7 +20,7 @@ from lidar_q_env import (COLLISION_PENALTY,FORWARD_LIDAR_WEIGHT,
                          WAYPOINT_REWARD,
                          LidarQEnvironment)
 from lidar_qlearning import (ACTION_NAMES,STATE_SPACE_SIZE,TabularLidarQ,
-                             safe_actions)
+                             WaypointRecovery)
 from q_learning import scene_signature
 from maze_search import depth_first_path
 from train_q_learning import read_world
@@ -29,9 +29,9 @@ from train_q_learning import read_world
 def epsilon_for_episode(episode,total,exploration_fraction):
     boundary=max(1,int(total*exploration_fraction))
     if episode<boundary:
-        return max(.45,1.-.55*episode/boundary)
+        return .30-.22*episode/boundary
     progress=(episode-boundary)/max(1,total-boundary)
-    return max(.04,.45*(.04/.45)**progress)
+    return max(.02,.08*(.02/.08)**progress)
 
 
 def run_episode(env,agent,route,goal,epsilon,heading,max_steps,*,learn,view=None,
@@ -45,12 +45,14 @@ def run_episode(env,agent,route,goal,epsilon,heading,max_steps,*,learn,view=None
     env.waypoint_count=len(route)-1
     total=0.;collision=False;success=False;updates=0;info={}
     min_front=float('inf')
+    recovery=WaypointRecovery()
+    allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,0.)
     for _ in range(max_steps):
         if learn:
-            action=agent.choose(state,epsilon,safe_actions(env.lidar_sectors))
+            action=agent.choose(state,epsilon,allowed)
         else:
             values=agent.values(state)
-            action=max(safe_actions(env.lidar_sectors),key=lambda a:float(values[a]))
+            action=max(allowed,key=lambda a:float(values[a]))
         final_goal=waypoint_index==len(route)-1
         next_state,reward,terminated,truncated,info=env.step(action,final_goal=final_goal)
         min_front=min(min_front,float(info['front_clearance_m']))
@@ -58,9 +60,14 @@ def run_episode(env,agent,route,goal,epsilon,heading,max_steps,*,learn,view=None
             waypoint_index+=1
             env.waypoint_index=waypoint_index
             next_state=env.set_waypoint(route[waypoint_index])
+            recovery=WaypointRecovery()
+        allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,
+                                 env.steps*env.decision_seconds)
+        env.recovery_active=recovery.active
+        env.allowed_actions=allowed
         if learn:
             agent.update(state,action,reward,next_state,terminated,
-                         safe_actions(env.lidar_sectors))
+                         allowed)
         state=next_state;total+=reward;updates+=1
         if view and not view.update(env,agent,episode,epsilon,steps_offset+updates):
             raise KeyboardInterrupt
@@ -144,10 +151,11 @@ def main():
                   action_names=ACTION_NAMES,
                   role='tabular Q-learning controls continuous differential-drive motion for a complete DFS route from maze start to goal',
                   training_tasks='each episode begins at maze start and ends at maze goal, collision, or timeout; heading is randomized',
-                  reward='4 x GPS next-waypoint progress - 0.025 per decision - 0.5 per metre travelled - directional clearance penalty (forward LiDAR weight 1.5x); +4 intermediate waypoint; +120 mission goal; -100 collision',
+                  reward='4 x GPS next-waypoint progress + 0.20 x heading error reduction - time, travel, clearance and idle costs; +4 waypoint; +120 goal; -100 collision',
                   forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
                   gps_travel_cost_per_meter=GPS_TRAVEL_COST_PER_METER,
-                  lidar_safety_mask='blocks a maneuver when its travel-direction sector is under 0.16 m; stop only when no movement is safe',
+                  lidar_safety_mask='0.16 m directional clearance for translation; footprint clearance for pivots',
+                  recovery='after 2 seconds without a new 2 cm waypoint progress, guides allowed Q actions until the next waypoint',
                   collision_reward=COLLISION_PENALTY,goal_reward=GOAL_REWARD,
                   waypoint_reward=WAYPOINT_REWARD,maze_signature=signature,
                   search_algorithm='depth_first_search',search_cells_visited=search_cells,
@@ -219,7 +227,7 @@ def main():
     (run_dir/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     print(json.dumps(summary,indent=2),flush=True)
     print(f'Run: {run_dir.resolve()}')
-    print(f'Simulation: bash run.sh sim --algorithm q_learning --policy {table_path.relative_to(ROOT)}')
+    print(f'Simulation: bash run.sh sim --algorithm q_learning --policy {table_path.resolve()}')
 
 
 if __name__=='__main__':main()

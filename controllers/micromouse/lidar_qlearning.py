@@ -6,16 +6,17 @@ from pathlib import Path
 
 import numpy as np
 
+from planner import ROBOT_RADIUS, SAFETY_MARGIN
 
 ACTION_NAMES = ('Maju', 'Lengkung kiri', 'Lengkung kanan',
-                'Belok kiri', 'Belok kanan', 'Mundur', 'Berhenti')
+                'Putar kiri', 'Putar kanan', 'Mundur', 'Berhenti')
 ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
-             (.12, 2.7), (.12, -2.7), (-.11, 0.), (0., 0.))
+             (0., 2.7), (0., -2.7), (-.11, 0.), (0., 0.))
 LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
 LIDAR_STATE_SECTORS = (0,1,2,4,6,7)
 SAFE_DISTANCE = .16
-STATE_VERSION = 7
+STATE_VERSION = 8
 STATE_SPACE_SIZE = 8*4*(3**len(LIDAR_STATE_SECTORS))
 
 
@@ -31,12 +32,50 @@ def safe_actions(lidar_sectors):
     if sectors[0]>=SAFE_DISTANCE:
         allowed.append(0)
     if sectors[0]>=SAFE_DISTANCE and sectors[1]>=SAFE_DISTANCE:
-        allowed.extend((1,3))
+        allowed.append(1)
     if sectors[0]>=SAFE_DISTANCE and sectors[7]>=SAFE_DISTANCE:
-        allowed.extend((2,4))
+        allowed.append(2)
+    if sectors.min() >= ROBOT_RADIUS + SAFETY_MARGIN:
+        allowed.extend((3, 4))
     if sectors[4]>=SAFE_DISTANCE:
         allowed.append(5)
     return tuple(allowed) if allowed else (6,)
+
+
+def waypoint_bearing(pose, target):
+    dx, dy = np.asarray(target) - pose[:2]
+    return (math.atan2(dy, dx) - pose[2] + math.pi) % (2 * math.pi) - math.pi
+
+
+class WaypointRecovery:
+    """After two seconds without progress, guide Q toward the active waypoint."""
+
+    def __init__(self):
+        self.best_distance = math.inf
+        self.last_progress = 0.
+        self.active = False
+
+    def actions(self, pose, target, sectors, seconds):
+        allowed = safe_actions(sectors)
+        distance = math.dist(pose[:2], target)
+        if distance <= self.best_distance - .02:
+            self.best_distance = distance
+            self.last_progress = seconds
+        self.active = self.active or seconds - self.last_progress >= 2.
+        if not self.active:
+            return allowed
+
+        bearing = waypoint_bearing(pose, target)
+        arc, pivot = (1, 3) if bearing >= 0 else (2, 4)
+        if abs(bearing) > .40 and pivot in allowed:
+            return (pivot,)
+        if abs(bearing) <= .40:
+            forward = tuple(action for action in (0, arc) if action in allowed)
+            if forward:
+                return forward
+            if abs(bearing) < .12 and 5 in allowed:
+                return (5,)
+        return allowed
 
 
 def aggregate_lidar(scan, maximum=4.):
@@ -74,7 +113,7 @@ def discretize_state(pose, goal, lidar_sectors):
     goal = np.asarray(goal, dtype=float)
     delta = goal-pose[:2]
     distance = float(np.linalg.norm(delta))
-    bearing = (math.atan2(delta[1], delta[0])-pose[2]+math.pi)%(2*math.pi)-math.pi
+    bearing = waypoint_bearing(pose, goal)
     bearing_bin = min(7, int((bearing+math.pi)/(2*math.pi/8)))
     distance_bin = int(np.digitize(distance, [.10,.25,.50]))
     selected=np.asarray(lidar_sectors,dtype=float)[list(LIDAR_STATE_SECTORS)]
