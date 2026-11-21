@@ -1,0 +1,14 @@
+test_double_target_uses_online_choice_and_terminal_bit (test_lidar_dqn.DQNTests.test_double_target_uses_online_choice_and_terminal_bit) ... ok
+test_encoder_and_velocity (test_lidar_dqn.DQNTests.test_encoder_and_velocity) ... ok
+test_forward_and_backward (test_lidar_dqn.DQNTests.test_forward_and_backward) ... ok
+test_lidar_mask_fallback (test_lidar_dqn.DQNTests.test_lidar_mask_fallback) ... ok
+test_mask_applies_to_greedy_and_epsilon (test_lidar_dqn.DQNTests.test_mask_applies_to_greedy_and_epsilon) ... ok
+test_optimizer_target_sync_save_load_resume (test_lidar_dqn.DQNTests.test_optimizer_target_sync_save_load_resume) ... ok
+test_original_collision_and_recovery (test_lidar_dqn.DQNTests.test_original_collision_and_recovery) ... ok
+test_real_maze_timeout_and_deterministic_evaluation (test_lidar_dqn.DQNTests.test_real_maze_timeout_and_deterministic_evaluation) ... ok
+test_replay_wrap_and_sample (test_lidar_dqn.DQNTests.test_replay_wrap_and_sample) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.836s
+
+OK

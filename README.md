@@ -86,6 +86,75 @@ tempuh hanya dihitung dari percobaan yang mencapai goal. Hasil ini mengukur
 kontrol gerak pada rute tetap. Pencarian rute dan fisika Webots perlu
 dievaluasi terpisah.
 
+## Double DQN dengan LiDAR
+
+`dqn` memakai observasi kontinu, enam aksi diskret, dan penyaringan LiDAR
+baik saat memilih aksi maupun menghitung target Q. DFS tetap menghasilkan
+target lokal. Training, evaluasi greedy, dan uji waktu dengan bobot beku
+menghasilkan artefak di `output/drl/`. Konfigurasi dapat diubah melalui
+`configs/lidar_dqn.json` atau file JSON yang diberikan dengan `--config`.
+
+```bash
+bash run.sh train --algorithm dqn --output output/drl-new
+.venv/bin/python tools/evaluate_lidar_dqn.py --checkpoint output/drl-new/models/last_model.pt --output output/drl-eval
+.venv/bin/python tools/analyze_lidar_dqn.py --output output/drl-new
+.venv/bin/python tools/export_lidar_dqn.py --checkpoint output/drl-new/models/last_model.pt --output output/drl-new/models/webots_model.json
+bash run.sh sim --algorithm dqn --fast --policy output/drl-new/models/webots_model.json
+```
+
+Gunakan `--stop-after-episodes` untuk berhenti pada batas episode, lalu
+`--resume <run>/models/checkpoint_latest.pt` dengan konfigurasi run yang sama.
+Untuk protokol, metrik, dan detail checkpoint, lihat
+`output/drl/analysis/drl_architecture.md`.
+
+## Rekaman training dan telemetry
+
+Tambahkan `--record DIREKTORI_BARU` pada trainer `q_learning` atau `dqn`
+untuk menangkap satu baris per langkah. Encoding berjalan terpisah dari
+training. Codec H.264 dipilih bila FFmpeg menyediakan libx264. Perekaman
+tidak perlu jendela. Gunakan `--no-render` pada trainer tabular untuk
+menonaktifkan preview.
+
+```bash
+bash run.sh train --algorithm q_learning --episodes 36 --exploration-fraction 0.5 --evaluation-runs 12 --no-render --record output/q_capture_baru
+bash run.sh train --algorithm dqn --output output/dqn_model_baru --record output/dqn_capture_baru
+.venv/bin/python tools/render_micromouse_recording.py --output output/q_capture_baru
+.venv/bin/python tools/validate_micromouse_recording.py --output output/q_capture_baru --training-episodes 36 --evaluation-episodes 12
+```
+
+Video mencakup setiap episode dengan sampling frame yang tercatat pada
+manifest. `frame_mapping.csv` menghubungkan frame, episode, langkah, waktu,
+dan baris asli pada telemetry. Setiap langkah tetap tersimpan di CSV dan JSONL.
+Reward dan pose setelah aksi dipisahkan dari observasi yang dipakai untuk
+memilih aksi. Baris loss hanya ada bila terjadi update gradien. Nilai TD
+individual DQN pada log update merujuk sampel pertama batch, dan agregat batch
+tersedia pada kolom tersendiri. Log dibuang dari buffer Python setiap 256
+langkah dan pada batas episode.
+
+Rekaman Webots dapat dirender terpisah dari file telemetry GPS, IMU, dan LiDAR
+dengan `tools/render_micromouse_webots.py`. Nilai yang tidak berasal dari
+inferensi fisika, seperti reward training, ditampilkan sebagai tidak tersedia.
+
+## Studi komparatif Tabular Q-Learning dan Double DQN
+
+Laporan final tersedia dalam
+[PDF](output/comparison/report/Laporan_Perbandingan_Q_Learning_vs_Double_DQN_Rafliansyah.pdf)
+dan [DOCX](output/comparison/report/Laporan_Perbandingan_Q_Learning_vs_Double_DQN_Rafliansyah.docx).
+Folder [output/comparison](output/comparison/) berisi lima video, grafik,
+data evaluasi, dan audit keterbandingan. Run sumber tersedia di
+[`output/q_learning`](output/q_learning/) dan [`output/drl`](output/drl/).
+
+Telemetry besar dipublikasikan dalam format gzip lossless. Untuk menyiapkan
+ulang file CSV, JSON, dan JSONL yang dibutuhkan skrip analisis, jalankan
+perintah berikut dari root repository.
+
+```bash
+find output/comparison output/q_learning output/drl -name '*.gz' -exec gzip -dk -- {} +
+```
+
+Langkah analisis ulang dan sumber data dijelaskan di
+[`data_provenance.md`](output/comparison/analysis/data_provenance.md).
+
 ## Optional legacy continuous SAC
 
 Older continuous SAC modes remain available by selecting `hidden_goal`, `sac`

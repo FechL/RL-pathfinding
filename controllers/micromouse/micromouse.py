@@ -161,6 +161,10 @@ def main():
         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
 
     algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
+    if algorithm == "dqn":
+        from lidar_dqn_webots import run
+        run(Supervisor())
+        return
     if algorithm in ("q_learning", "drl"):
         from lidar_q_webots import run
         run(Supervisor(), drl=algorithm == "drl")

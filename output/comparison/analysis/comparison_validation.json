@@ -1,0 +1,19 @@
+{
+  "source_hashes": 39,
+  "telemetry_rows": {
+    "q_learning-5339bee874b3": 57424,
+    "double_dqn-7420a5be748f": 79815
+  },
+  "episodes": 117,
+  "frozen_pairs": 12,
+  "video_frames": {
+    "training_comparison.mp4": 1175,
+    "evaluation_side_by_side.mp4": 867,
+    "best_route_comparison.mp4": 710,
+    "telemetry_comparison.mp4": 129,
+    "trajectory_comparison.mp4": 192
+  },
+  "video_panels_mapped": 6146,
+  "graphs": 24,
+  "status": "passed"
+}

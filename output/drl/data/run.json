@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "algorithm": "masked_double_dqn",
+  "architecture_base": "5c4cf33c2e045245be1cf49340a5a5e7eb27f5fa",
+  "head": "8679ee6902564e859ce15fde3511c54169ede416",
+  "generated_at_utc": "2026-11-21T13:09:52.387413+00:00",
+  "python": "3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:19:41) [GCC 14.3.0]",
+  "pytorch": "2.15.0+cpu",
+  "cuda_available": false,
+  "device": "cpu",
+  "machine": "x86_64",
+  "cpu": "x86_64",
+  "config": {
+    "episodes": 36,
+    "timeout": 300.0,
+    "evaluation_runs": 12,
+    "seed": 42,
+    "learning_rate": 0.001,
+    "gamma": 0.98,
+    "capacity": 100000,
+    "batch_size": 64,
+    "warmup": 1000,
+    "epsilon_start": 1.0,
+    "epsilon_min": 0.05,
+    "epsilon_decay_fraction": 0.6,
+    "target_interval": 1000,
+    "gradient_clip": 10.0,
+    "hidden": [
+      128,
+      128
+    ],
+    "update_every": 1,
+    "checkpoint_every": 5,
+    "speed_trials": 3,
+    "device": "cpu"
+  },
+  "observation": [
+    "bearing_sin",
+    "bearing_cos",
+    "target_distance_over_arena_diagonal",
+    "front",
+    "front_left",
+    "left",
+    "right",
+    "front_right",
+    "linear_speed",
+    "yaw_rate",
+    "scanning",
+    "collision_recovery"
+  ],
+  "actions": [
+    {
+      "name": "Maju",
+      "velocity": [
+        0.23,
+        0.0
+      ]
+    },
+    {
+      "name": "Lengkung kiri",
+      "velocity": [
+        0.19,
+        1.15
+      ]
+    },
+    {
+      "name": "Lengkung kanan",
+      "velocity": [
+        0.19,
+        -1.15
+      ]
+    },
+    {
+      "name": "Putar kiri",
+      "velocity": [
+        0.0,
+        2.7
+      ]
+    },
+    {
+      "name": "Putar kanan",
+      "velocity": [
+        0.0,
+        -2.7
+      ]
+    },
+    {
+      "name": "Berhenti",
+      "velocity": [
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "parameters": 18950,
+  "maze": {
+    "signature": "d1963437dffe589d2b1f30f88ac8328a68465c3c777fac8831b539d49548b767",
+    "start": [
+      -3.0,
+      -3.0
+    ],
+    "goal": [
+      2.8,
+      2.8
+    ],
+    "bounds": [
+      -3.2,
+      3.2,
+      -3.2,
+      3.2
+    ],
+    "cell_size": 0.4,
+    "distance_scale": 9.050966799187808,
+    "step_s": 0.16,
+    "max_steps": 1875
+  },
+  "nominal_step_budget": 67500,
+  "reward_source": "LidarQEnvironment.step",
+  "eval_protocol": "epsilon zero, seed i, heading ((i % 8) - 3.5) * pi/4",
+  "route_protocol": "freeze final model; replay discovered candidates with headings 0, -0.10, +0.10 radians",
+  "scoring_best_checkpoint": "successful training episode, then fewest contacts, then shortest duration; final checkpoint is evaluated"
+}

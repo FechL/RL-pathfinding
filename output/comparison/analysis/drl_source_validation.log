@@ -1,0 +1,56 @@
+{
+  "result": "passed",
+  "episodes": {
+    "training": 36,
+    "evaluation": 12,
+    "route_speed_test": 21
+  },
+  "step_rows": 79815,
+  "step_phases": {
+    "training": 52148,
+    "evaluation": 10516,
+    "route_speed_test": 17151
+  },
+  "learning_updates": {
+    "dqn": 51149
+  },
+  "decoded_primary": [
+    "training_full.mp4",
+    "training_overview.mp4",
+    "final_evaluation.mp4",
+    "best_successful_run.mp4",
+    "webots_evaluation.mp4"
+  ],
+  "videos_probed": 75,
+  "best": {
+    "filename": "best_successful_run.mp4",
+    "selection": "minimum successful time",
+    "run_id": "double_dqn-7420a5be748f",
+    "algorithm": "double_dqn",
+    "episode": "5",
+    "phase": "route_speed_test",
+    "recording_phase": "route_speed_test",
+    "episode_key": "route_speed_test-000005",
+    "total_steps": "617",
+    "total_reward": "295.25707947447813",
+    "average_reward_per_step": "0.47853659558262257",
+    "duration_simulation_s": "98.72",
+    "duration_wall_clock_s": "1.8876270319997275",
+    "success": "True",
+    "collision": "False",
+    "collision_count": "0",
+    "timeout": "False",
+    "search_exhausted": "False",
+    "epsilon_start": "0.0",
+    "epsilon_end": "0.0",
+    "unique_states_visited": "",
+    "replay_buffer_size": "",
+    "gradient_updates": "",
+    "best_reward_so_far": "310.9357955577517",
+    "best_successful_time_so_far": "98.72",
+    "distance_to_goal_m": "0.06335341591104555",
+    "first_row": "65337",
+    "last_row": "65953",
+    "frame_stride": 1
+  }
+}

@@ -1,0 +1,51 @@
+Episode 1/3 | goal=False | tabrakan=0 | langkah=25 | epsilon=0.493 | update=0
+{
+  "training": {
+    "episodes": 1,
+    "steps": 25,
+    "routes_found": 0,
+    "training_successes": 0,
+    "training_seconds": 0.06769130500106257,
+    "gradient_updates": 0,
+    "target_updates": 0
+  }
+}
+Episode 2/3 | goal=False | tabrakan=0 | langkah=50 | epsilon=0.050 | update=0
+Episode 3/3 | goal=False | tabrakan=0 | langkah=75 | epsilon=0.050 | update=12
+Evaluasi 1: goal=False | waktu=4.00s
+{
+  "training": {
+    "episodes": 3,
+    "steps": 75,
+    "routes_found": 0,
+    "training_successes": 0,
+    "training_seconds": 0.19432920600229409,
+    "gradient_updates": 12,
+    "target_updates": 0
+  },
+  "checkpoint": "/tmp/micromouse-dqn.2hRnwU/resume/models/last_model.pt",
+  "sha256": "2a92537965cb4d916b79b718f5da4097499870a1c55b3dca13600db66ac70b84",
+  "episode": 3,
+  "epsilon": 0,
+  "online_frozen": true,
+  "evaluation": {
+    "runs": 1,
+    "successes": 0,
+    "failures": 1,
+    "success_rate": 0.0,
+    "collision_episodes": 1,
+    "collision_events": 1,
+    "timeouts": 1,
+    "search_exhausted": 0,
+    "average_reward": -103.39118665475858,
+    "median_reward": -103.39118665475858,
+    "average_steps": 25,
+    "median_steps": 25,
+    "average_duration_s": 4.0,
+    "best_success_s": null,
+    "mean_distance_m": 0.3995485473521572
+  },
+  "route_tests": 0,
+  "route_successes": 0,
+  "fastest_route": null
+}

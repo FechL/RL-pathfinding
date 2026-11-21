@@ -1,0 +1,30 @@
+{
+  "cpu_model": "12th Gen Intel(R) Core(TM) i5-12450H",
+  "implementation_patch_sha256": "f149b7aaf87fbf3210c608837605c0642c0dbcdcd3699c4b511a1b068bb85db3",
+  "sha256": {
+    "data/action_values.csv": "0dbf42d2c6f710e76eba27dab0298e356dd2c537733d737974b915360c1ad0c9",
+    "data/evaluation_results.csv": "e1ed14d2ccd2cea4b3ad853e3a9afc65514db29c1708faab53412ec8eb2fb9e1",
+    "data/evaluations.json": "9e315b174da4fbc530bdd614176fb5b8f16d85580ab11ae831ed950858a6daac",
+    "data/routes.json": "afd7dbf65eeb4d6ba47651ed9967f9ff53b6f98a7e43c0a8e3db0782c85aed5e",
+    "data/run.json": "dcd64d61198905b24ed838d86973602f68c9b8b5f654a029421f07b0ab655511",
+    "data/summary.json": "b37756a61920a1eccfb5827d3dd1312d231f36244c48a4ee4138e7a9cc1ab8c0",
+    "data/training.csv": "b8ba92a14502ae453b92f6425f93fedec39ca4ea3edfcab1cde9c87508cdd3c5",
+    "data/webots/latest_run.json": "89bd3bbe0348ea0663262544f9ce4ca12bac7e3bfc0edd0b59c9dabc9bbc233b",
+    "graphs/collision_per_episode.png": "e5d991a8ca4c5ba2eab4cfe850a14049e36f8d4b79b202381b5a96ee4e949b80",
+    "graphs/duration_per_episode.png": "8ef152d3b53c69a021300170ebbe45f200dec4a73b845072927e11b493adc38d",
+    "graphs/epsilon_decay.png": "29c78334810038c69c5c96af7c89cb810346aeda67ad7787fe823af21d0081a5",
+    "graphs/moving_average_reward.png": "7bc62f47db2b32702482f9c9ada914d81cc8777b1c940a824f76b56daeb2aa70",
+    "graphs/q_value_evolution.png": "e35a7927ad1283a23e6150a16dc80e21e4f9958ec5edf6edf5179bf0e0c21a99",
+    "graphs/reward_per_episode.png": "29091b580c0476a9d2b25c2b32f91aea96c29aba90c9017339975575e418c28a",
+    "graphs/speed_test.png": "ebecedc59732246363bc4f0757a6754c93bb6589f0d9e001dd8b788a7d3587f4",
+    "graphs/steps_per_episode.png": "9ca55d849098cc18320273c2f9baf96d6e352c25ca33b32ea177ee4c260099cc",
+    "graphs/success_rate.png": "bcd49c62a30718df124c2d0f6aed46e3dd4ed88c13cfdf19b9023cb7ed900a73",
+    "graphs/td_loss.png": "e1d0327700c46be3b6efeb12358868289e32856c592b6e5df2fcec3ecf6330d9",
+    "graphs/webots_trajectory.png": "36b43a0ff63c8a1778a88e15a01d4cdf6508668d46764a823f981ebcda386c1e",
+    "models/best_model.pt": "71fb84f8b311df82833c62b055f8ef7045f2b3a7ebdca314702e36d7024c0e8b",
+    "models/checkpoint_latest.pt": "955a6de6f2db79ea2e5322d48a11daec97472c89998e7f6ca780e587450ed44b",
+    "models/last_model.pt": "415ae6a7673cb23be9eb12c43be8aac6baf93f1edc6c11787340e81a2e758545",
+    "models/target_network.pt": "c423ffdcc5abc920cf3dd568c72c433af656ee254a1cff49924cae4fac4d3242",
+    "models/webots_model.json": "675da11d109d91d06ef15b45fbd2aba68977ab2abb03638d08a44f3223e1e78e"
+  }
+}

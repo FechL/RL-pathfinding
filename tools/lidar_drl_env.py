@@ -30,9 +30,13 @@ class LidarMission(gym.Env):
         self.episode_index += 1
         env.episode_index = self.episode_index
         self.collision_count = 0
+        self.last_transition = None
+        search_seed = mission.get('search_seed')
+        if search_seed is None:
+            search_seed = int(self.np_random.integers(2**32))
         self.route_search = LidarMazeSearch(
             env.base_start, env.base_goal, env.nav.bounds, env.nav.cell_size,
-            seed=int(self.np_random.integers(2**32)), replay=self.replay)
+            seed=search_seed, replay=self.replay)
         self.target = None
         self._select_target()
         return self._observation(), {}
@@ -78,6 +82,7 @@ class LidarMission(gym.Env):
             category, velocity = drive_command(action, env.lidar_sectors, self.allowed_actions())
         _, reward, terminal, truncated, info = env.step(
             category, final_goal=self.route_search.final, scanning=scanning, velocity=velocity)
+        self.last_transition = dict(info,reward_step=reward)
         if info['collision']:
             self.collision_count += 1
             self.recovery.active = True

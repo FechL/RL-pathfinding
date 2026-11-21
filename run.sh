@@ -16,6 +16,10 @@ case "$mode" in
         if [[ "$mode" == "train" ]]; then
             if [[ "${1:-}" == "--algorithm" ]]; then
                 case "${2:-}" in
+                    dqn)
+                        shift 2
+                        exec "$training_python" "$project_dir/tools/train_lidar_dqn.py" "$@"
+                        ;;
                     q_learning|lidar_q)
                         shift 2
                         exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
@@ -64,6 +68,8 @@ case "$mode" in
         echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal (legacy)"
         echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
         echo "bash run.sh train --algorithm drl   Training SAC dengan pencarian LiDAR"
+        echo "bash run.sh train --algorithm dqn   Training Double DQN dengan LiDAR"
+        echo "bash run.sh sim --algorithm dqn --fast  Inferensi Double DQN di Webots"
         echo "bash run.sh sim --algorithm drl --fast  Simulasi hasil training DRL"
         echo "bash run.sh compare --help          Bandingkan Q-learning dan DRL"
         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
@@ -87,7 +93,7 @@ case "$mode" in
                 --best-route) export MICROMOUSE_BEST_ROUTE=1; shift ;;
                 --algorithm)
                     case "${2:-}" in
-                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|drl|astar)
+                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|drl|dqn|astar)
                             if [[ "$2" == "rl" ]]; then
                                 export MICROMOUSE_ALGORITHM=hidden_goal
                             else

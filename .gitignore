@@ -13,3 +13,18 @@ reports/lidar_drl/runs/
 reports/rl/runs/
 reports/rl/**/models/*.zip
 reports/rl/**/models/*.pkl
+
+# Large generated telemetry is published as lossless .gz files.
+/output/comparison/data/common_telemetry.csv
+/output/comparison/data/common_telemetry.jsonl
+/output/drl/telemetry/step_telemetry.jsonl
+/output/drl/telemetry/learning_updates.csv
+/output/drl/telemetry/step_telemetry.csv
+/output/drl/recording_run/interrupted_capture/telemetry/step_telemetry.jsonl
+/output/drl/recording_run/interrupted_capture/telemetry/learning_updates.csv
+/output/drl/recording_run/interrupted_capture/telemetry/step_telemetry.csv
+/output/q_learning/telemetry/webots_step_telemetry.jsonl
+/output/q_learning/telemetry/step_telemetry.jsonl
+/output/q_learning/telemetry/learning_updates.csv
+/output/q_learning/telemetry/webots_source.json
+/output/q_learning/telemetry/step_telemetry.csv

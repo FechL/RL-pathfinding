@@ -46,10 +46,13 @@ def remove_backtracking(targets):
 
 
 def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
-                replay=(), view=None, episode=0, steps_offset=0):
+                replay=(), view=None, episode=0, steps_offset=0, recorder=None,
+                phase='exploration', recording_phase='training'):
     search = LidarMazeSearch(env.base_start, env.base_goal, env.nav.bounds,
                              env.nav.cell_size, seed=seed, replay=replay)
     env.reset(heading=heading)
+    if recorder:
+        recorder.begin(episode,phase,epsilon,recording_phase)
     target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
     exhausted = target is None and search.scan_bearing is None
     state = env.last_state if target is None else env.set_waypoint(target)
@@ -62,6 +65,8 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
     for _ in range(0 if exhausted else max_steps):
         scanning = target is None
         recovering = env.collision_recovery
+        key = agent.key(state)
+        visits = agent.visits.get(key,0) if recorder and not (scanning or recovering) else None
         if recovering:
             action = STOP_ACTION
         elif scanning:
@@ -69,8 +74,16 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
         elif learn:
             action=agent.choose(state,epsilon,allowed)
         else:
-            values=agent.values(state)
-            action=max(allowed,key=lambda a:float(values[a]))
+            values=agent.q.get(key)
+            action=max(allowed,key=lambda a:float(values[a]) if values is not None else 0.)
+        if recorder:
+            table_values = agent.q.get(key,[0.]*len(ACTION_NAMES))
+            row = recorder.decision(env,target,action,(action,) if scanning or recovering else allowed,
+                epsilon,state=None if scanning or recovering else state,
+                q=None if scanning or recovering else table_values,scanning=scanning,recovering=recovering,
+                alpha=agent.alpha,gamma=agent.gamma,state_visits_before=visits,
+                state_visits_after=None if visits is None else agent.visits.get(key,0),
+                q_update_applied=False)
         next_state,reward,terminated,truncated,info=env.step(action,final_goal=search.final,scanning=scanning)
         if info['collision']:
             collision_count += 1
@@ -90,9 +103,17 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
         env.collision_count = collision_count
         env.recovery_active=recovery.active
         env.allowed_actions = (search.scan_action(env.lidar_sectors),) if target is None and not exhausted else allowed
+        learning = None
         if learn and not scanning and not recovering:
-            agent.update(state,action,reward,next_state,terminated or target is None,
+            old,new,td=agent.update(state,action,reward,next_state,terminated or target is None,
                          allowed)
+            if recorder:
+                learning=dict(q_old=old,q_new=new,td_target=td,td_error=td-old,q_update_applied=True)
+        if recorder:
+            recorder.step(row,env,dict(info,reward_step=reward,collision_count=collision_count),
+                terminal=terminated,truncated=truncated,exhausted=exhausted,
+                episode_end=terminated or truncated or exhausted or updates+1>=max_steps,
+                learning=learning)
         state=next_state;total+=reward;updates+=1
         if view and not view.update(env,agent,episode,epsilon,steps_offset+updates):
             raise KeyboardInterrupt
@@ -113,14 +134,18 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
                 waypoints=len(search.route), search_exhausted=exhausted,
                 cells_visited=len(search.edges), duration_s=updates*env.decision_seconds,
                 route=search.route if success else [])
+    if recorder:
+        recorder.end(env,result)
     return result,updates
 
 
-def evaluate(env,agent,runs=40,max_steps=120):
+def evaluate(env,agent,runs=40,max_steps=120,recorder=None):
     results=[]
     for index in range(runs):
         heading=((index%8)-3.5)*math.pi/4
-        result,_=run_episode(env,agent,0.,heading,max_steps,seed=index,learn=False)
+        result,_=run_episode(env,agent,0.,heading,max_steps,seed=index,learn=False,
+                             recorder=recorder,episode=index+1,phase='evaluation',
+                             recording_phase='evaluation')
         results.append(dict(seed=index,**result))
     return results
 
@@ -128,6 +153,7 @@ def evaluate(env,agent,runs=40,max_steps=120):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--episodes',type=int,default=3000)
+    parser.add_argument('--record',type=Path,help='Record every step in a fresh telemetry directory')
     parser.add_argument('--steps',type=int,help='Optional total training step budget across episodes')
     parser.add_argument('--max-steps',type=int,
                         help='Optional decision cap; by default the timeout sets the episode length')
@@ -193,6 +219,12 @@ def main():
                   waypoint_reward=WAYPOINT_REWARD,maze_signature=signature,
                   search_algorithm='online_lidar_dfs')
     (run_dir/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
+    recorder = None
+    if args.record:
+        from micromouse_recording import Recording
+        recorder = Recording(args.record,'q_learning',env)
+        import atexit
+        atexit.register(recorder.close,'interrupted')
     view=None
     if args.render:
         from lidar_q_view import LidarQView
@@ -235,7 +267,8 @@ def main():
                 final_info,updates=run_episode(env,agent,epsilon,heading,
                                                max_steps,seed=episode,learn=True,view=view,
                                                replay=candidate['targets'] if candidate else (),
-                                               episode=episode+1,steps_offset=total_steps)
+                                               episode=episode+1,steps_offset=total_steps,
+                                               recorder=recorder,phase=phase)
                 total_steps+=updates
                 elapsed = time.perf_counter()-began
                 success=final_info['success'];collision=final_info['collision']
@@ -297,7 +330,9 @@ def main():
                                               best_speed_trial=best_trial),indent=2)+'\n')
         if view:view.close()
 
-    eval_results=evaluate(env,agent,args.evaluation_runs,env.max_steps)
+    eval_results=evaluate(env,agent,args.evaluation_runs,env.max_steps,recorder)
+    if recorder:
+        recorder.close('captured' if episodes_completed==args.episodes else 'partial')
     summary=dict(**manifest,episodes_completed=episodes_completed,
                  first_success_episode=first_success,training_successes=success_count,
                  steps=total_steps,render=args.render,first_success_step=first_success_step,

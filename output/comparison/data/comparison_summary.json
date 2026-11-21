@@ -1,0 +1,622 @@
+{
+  "sources": {
+    "q_learning": {
+      "data": "output/q_learning/recording_run",
+      "run_id": "q_learning-5339bee874b3",
+      "steps": 57424,
+      "best": {
+        "filename": "best_successful_run.mp4",
+        "selection": "minimum successful time",
+        "run_id": "q_learning-5339bee874b3",
+        "algorithm": "q_learning",
+        "episode": "20",
+        "phase": "speed_test",
+        "recording_phase": "training",
+        "episode_key": "training-000020",
+        "total_steps": "710",
+        "total_reward": "197.6009397902672",
+        "average_reward_per_step": "0.2783111828031932",
+        "duration_simulation_s": "113.60000000000001",
+        "duration_wall_clock_s": "2.913276302999293",
+        "success": "True",
+        "collision": "True",
+        "collision_count": "1",
+        "timeout": "False",
+        "search_exhausted": "False",
+        "epsilon_start": "0.07406997698298323",
+        "epsilon_end": "0.07406997698298323",
+        "unique_states_visited": "142",
+        "replay_buffer_size": "",
+        "gradient_updates": "",
+        "best_reward_so_far": "362.1992059590718",
+        "best_successful_time_so_far": "113.60000000000001",
+        "distance_to_goal_m": "0.07160814106603634",
+        "first_row": "27416",
+        "last_row": "28125",
+        "frame_stride": 1
+      }
+    },
+    "drl": {
+      "data": "output/drl/recording_run/data",
+      "run_id": "double_dqn-7420a5be748f",
+      "steps": 79815,
+      "best": {
+        "filename": "best_successful_run.mp4",
+        "selection": "minimum successful time",
+        "run_id": "double_dqn-7420a5be748f",
+        "algorithm": "double_dqn",
+        "episode": "5",
+        "phase": "route_speed_test",
+        "recording_phase": "route_speed_test",
+        "episode_key": "route_speed_test-000005",
+        "total_steps": "617",
+        "total_reward": "295.25707947447813",
+        "average_reward_per_step": "0.47853659558262257",
+        "duration_simulation_s": "98.72",
+        "duration_wall_clock_s": "1.8876270319997275",
+        "success": "True",
+        "collision": "False",
+        "collision_count": "0",
+        "timeout": "False",
+        "search_exhausted": "False",
+        "epsilon_start": "0.0",
+        "epsilon_end": "0.0",
+        "unique_states_visited": "",
+        "replay_buffer_size": "",
+        "gradient_updates": "",
+        "best_reward_so_far": "310.9357955577517",
+        "best_successful_time_so_far": "98.72",
+        "distance_to_goal_m": "0.06335341591104555",
+        "first_row": "65337",
+        "last_row": "65953",
+        "frame_stride": 1
+      }
+    }
+  },
+  "metrics": {
+    "q_learning": {
+      "evaluation": {
+        "episodes": 12,
+        "success": 9,
+        "collision": 6,
+        "timeout": 3,
+        "search_exhausted": 0,
+        "failed": 3,
+        "success_rate": 75.0,
+        "success_after_collision": 3,
+        "steps_total": 14714,
+        "collision_count_total": 16,
+        "scan_steps_total": 1752,
+        "recovery_steps_total": 78,
+        "waypoint_events_total": 930,
+        "updates_total": 0,
+        "wall_s_total": 64.08545727000819,
+        "reward": {
+          "mean": 247.9841902608793,
+          "median": 290.1022035352505,
+          "sd": 191.89837257050263,
+          "min": -253.55901387251856,
+          "max": 467.49697621694054
+        },
+        "steps": {
+          "mean": 1226.1666666666667,
+          "median": 1185.5,
+          "sd": 461.53889491044146,
+          "min": 747,
+          "max": 1875
+        },
+        "duration_s": {
+          "mean": 196.18666666666667,
+          "median": 189.68,
+          "sd": 73.84622318567064,
+          "min": 119.52,
+          "max": 300.0
+        },
+        "distance_m": {
+          "mean": 31.1910745008097,
+          "median": 29.503170510310987,
+          "sd": 11.906858019259667,
+          "min": 19.05525747823377,
+          "max": 49.58841683523976
+        },
+        "avg_speed_m_s": {
+          "mean": 0.15896353398700724,
+          "median": 0.15906828871201606,
+          "sd": 0.003760119415450504,
+          "min": 0.15374303637920503,
+          "max": 0.16529472278413254
+        },
+        "best_success_s": 119.52,
+        "mean_success_s": 161.5822222222222,
+        "final_5_reward": 142.56772366304492
+      },
+      "training": {
+        "episodes": 36,
+        "success": 29,
+        "collision": 18,
+        "timeout": 7,
+        "search_exhausted": 0,
+        "failed": 7,
+        "success_rate": 80.55555555555556,
+        "success_after_collision": 12,
+        "steps_total": 42710,
+        "collision_count_total": 564,
+        "scan_steps_total": 2131,
+        "recovery_steps_total": 2813,
+        "waypoint_events_total": 2014,
+        "updates_total": 37766,
+        "wall_s_total": 176.3217694130035,
+        "reward": {
+          "mean": -1309.4046903744095,
+          "median": 245.17065274211095,
+          "sd": 4458.855569760286,
+          "min": -16722.736753313788,
+          "max": 365.08013924380043
+        },
+        "steps": {
+          "mean": 1186.388888888889,
+          "median": 1027.5,
+          "sd": 410.5198291906618,
+          "min": 710,
+          "max": 1875
+        },
+        "duration_s": {
+          "mean": 189.82222222222222,
+          "median": 164.39999999999998,
+          "sd": 65.6831726705059,
+          "min": 113.60000000000001,
+          "max": 300.0
+        },
+        "distance_m": {
+          "mean": 25.46250822396789,
+          "median": 24.355454587742944,
+          "sd": 5.81078930114789,
+          "min": 18.72804027339721,
+          "max": 39.50875722030087
+        },
+        "avg_speed_m_s": {
+          "mean": 0.13985722344046855,
+          "median": 0.14016498577230438,
+          "sd": 0.020573465852734455,
+          "min": 0.09503578858052265,
+          "max": 0.16723487496481065
+        },
+        "best_success_s": 113.60000000000001,
+        "mean_success_s": 163.22758620689655,
+        "final_5_reward": 264.87911553712195
+      }
+    },
+    "drl": {
+      "evaluation": {
+        "episodes": 12,
+        "success": 12,
+        "collision": 0,
+        "timeout": 0,
+        "search_exhausted": 0,
+        "failed": 0,
+        "success_rate": 100.0,
+        "success_after_collision": 0,
+        "steps_total": 10516,
+        "collision_count_total": 0,
+        "scan_steps_total": 1385,
+        "recovery_steps_total": 0,
+        "waypoint_events_total": 693,
+        "updates_total": 0,
+        "wall_s_total": 32.87068764198921,
+        "reward": {
+          "mean": 357.73881057295563,
+          "median": 318.58668468809725,
+          "sd": 92.68277406757312,
+          "min": 312.2455782347503,
+          "max": 636.8507619853016
+        },
+        "steps": {
+          "mean": 876.3333333333334,
+          "median": 739.5,
+          "sd": 325.5100426696354,
+          "min": 712,
+          "max": 1833
+        },
+        "duration_s": {
+          "mean": 140.21333333333334,
+          "median": 118.32,
+          "sd": 52.08160682714168,
+          "min": 113.92,
+          "max": 293.28000000000003
+        },
+        "distance_m": {
+          "mean": 23.128259403246275,
+          "median": 19.323925116793006,
+          "sd": 8.750446615381822,
+          "min": 19.05973435053834,
+          "max": 49.27699273718424
+        },
+        "avg_speed_m_s": {
+          "mean": 0.1648654891166113,
+          "median": 0.1654154572400439,
+          "sd": 0.002826383533445218,
+          "min": 0.15952559703302766,
+          "max": 0.16802029711260308
+        },
+        "best_success_s": 113.92,
+        "mean_success_s": 140.21333333333334,
+        "final_5_reward": 395.76532339734683
+      },
+      "route_speed_test": {
+        "episodes": 21,
+        "success": 21,
+        "collision": 8,
+        "timeout": 0,
+        "search_exhausted": 0,
+        "failed": 0,
+        "success_rate": 100.0,
+        "success_after_collision": 8,
+        "steps_total": 17151,
+        "collision_count_total": 8,
+        "scan_steps_total": 0,
+        "recovery_steps_total": 40,
+        "waypoint_events_total": 1146,
+        "updates_total": 0,
+        "wall_s_total": 56.19585443799588,
+        "reward": {
+          "mean": 306.56282093372465,
+          "median": 307.963924237237,
+          "sd": 61.25586447775663,
+          "min": 192.0340735948232,
+          "max": 392.38977209301856
+        },
+        "steps": {
+          "mean": 816.7142857142857,
+          "median": 848,
+          "sd": 136.43611796630057,
+          "min": 617,
+          "max": 984
+        },
+        "duration_s": {
+          "mean": 130.67428571428573,
+          "median": 135.68,
+          "sd": 21.829778874608095,
+          "min": 98.72,
+          "max": 157.44
+        },
+        "best_success_s": 98.72,
+        "mean_success_s": 130.67428571428573,
+        "final_5_reward": 318.1855218396449
+      },
+      "training": {
+        "episodes": 36,
+        "success": 18,
+        "collision": 28,
+        "timeout": 18,
+        "search_exhausted": 0,
+        "failed": 18,
+        "success_rate": 50.0,
+        "success_after_collision": 11,
+        "steps_total": 52148,
+        "collision_count_total": 1138,
+        "scan_steps_total": 4171,
+        "recovery_steps_total": 5663,
+        "waypoint_events_total": 2049,
+        "updates_total": 51149,
+        "wall_s_total": 302.3052910449951,
+        "reward": {
+          "mean": -2977.7889463055576,
+          "median": -4.967815240506511,
+          "sd": 5397.763792529876,
+          "min": -15485.362595405215,
+          "max": 382.2358490251047
+        },
+        "steps": {
+          "mean": 1448.5555555555557,
+          "median": 1686.0,
+          "sd": 457.4018205001215,
+          "min": 729,
+          "max": 1875
+        },
+        "duration_s": {
+          "mean": 231.76888888888888,
+          "median": 269.76,
+          "sd": 73.18429128001945,
+          "min": 116.64,
+          "max": 300.0
+        },
+        "distance_m": {
+          "mean": 28.346165239777218,
+          "median": 29.170673744001355,
+          "sd": 7.67318364245419,
+          "min": 17.279247173886404,
+          "max": 46.84152114903492
+        },
+        "avg_speed_m_s": {
+          "mean": 0.12697200281511936,
+          "median": 0.12804342587586434,
+          "sd": 0.023093292720845655,
+          "min": 0.08803092266595038,
+          "max": 0.163229498018657
+        },
+        "best_success_s": 116.64,
+        "mean_success_s": 163.5377777777778,
+        "final_5_reward": 253.29829503192516
+      }
+    }
+  },
+  "training_phases": {
+    "q_learning": {
+      "exploration": {
+        "episodes": 18,
+        "success": 11,
+        "collision": 14,
+        "timeout": 7,
+        "search_exhausted": 0,
+        "failed": 7,
+        "success_rate": 61.111111111111114,
+        "success_after_collision": 8,
+        "steps_total": 26628,
+        "collision_count_total": 560,
+        "scan_steps_total": 2131,
+        "recovery_steps_total": 2793,
+        "waypoint_events_total": 1030,
+        "updates_total": 21704,
+        "wall_s_total": 108.49079585299842,
+        "reward": {
+          "mean": -2917.301849884277,
+          "median": 42.07063368843312,
+          "sd": 5954.31725327015,
+          "min": -16722.736753313788,
+          "max": 362.1992059590718
+        },
+        "steps": {
+          "mean": 1479.3333333333333,
+          "median": 1537.0,
+          "sd": 381.4278129221678,
+          "min": 888,
+          "max": 1875
+        },
+        "duration_s": {
+          "mean": 236.69333333333333,
+          "median": 245.92000000000002,
+          "sd": 61.02845006754684,
+          "min": 142.08,
+          "max": 300.0
+        },
+        "distance_m": {
+          "mean": 28.472615001017303,
+          "median": 30.010860905941904,
+          "sd": 6.442870567747494,
+          "min": 19.873236886127412,
+          "max": 39.50875722030087
+        },
+        "avg_speed_m_s": {
+          "mean": 0.12202187026867203,
+          "median": 0.12388041096350337,
+          "sd": 0.012283202735630779,
+          "min": 0.09503578858052265,
+          "max": 0.1404564011185994
+        },
+        "best_success_s": 142.08,
+        "mean_success_s": 196.40727272727273,
+        "final_5_reward": 281.5084430551829
+      },
+      "speed_test": {
+        "episodes": 18,
+        "success": 18,
+        "collision": 4,
+        "timeout": 0,
+        "search_exhausted": 0,
+        "failed": 0,
+        "success_rate": 100.0,
+        "success_after_collision": 4,
+        "steps_total": 16082,
+        "collision_count_total": 4,
+        "scan_steps_total": 0,
+        "recovery_steps_total": 20,
+        "waypoint_events_total": 984,
+        "updates_total": 16062,
+        "wall_s_total": 67.83097356000508,
+        "reward": {
+          "mean": 298.4924691354578,
+          "median": 308.1943131187726,
+          "sd": 59.6852554386143,
+          "min": 185.28544707169442,
+          "max": 365.08013924380043
+        },
+        "steps": {
+          "mean": 893.4444444444445,
+          "median": 942.0,
+          "sd": 140.5356233768097,
+          "min": 710,
+          "max": 1195
+        },
+        "duration_s": {
+          "mean": 142.95111111111112,
+          "median": 150.72000000000003,
+          "sd": 22.48569974028955,
+          "min": 113.60000000000001,
+          "max": 191.20000000000002
+        },
+        "distance_m": {
+          "mean": 22.45240144691848,
+          "median": 24.06926318946837,
+          "sd": 2.9696297041136797,
+          "min": 18.72804027339721,
+          "max": 26.131688845187487
+        },
+        "avg_speed_m_s": {
+          "mean": 0.1576925766122651,
+          "median": 0.15895453287177685,
+          "sd": 0.006850756084340108,
+          "min": 0.1364153057792817,
+          "max": 0.16723487496481065
+        },
+        "best_success_s": 113.60000000000001,
+        "mean_success_s": 142.95111111111112,
+        "final_5_reward": 264.87911553712195
+      }
+    },
+    "drl": {
+      "exploration": {
+        "episodes": 36,
+        "success": 18,
+        "collision": 28,
+        "timeout": 18,
+        "search_exhausted": 0,
+        "failed": 18,
+        "success_rate": 50.0,
+        "success_after_collision": 11,
+        "steps_total": 52148,
+        "collision_count_total": 1138,
+        "scan_steps_total": 4171,
+        "recovery_steps_total": 5663,
+        "waypoint_events_total": 2049,
+        "updates_total": 51149,
+        "wall_s_total": 302.3052910449951,
+        "reward": {
+          "mean": -2977.7889463055576,
+          "median": -4.967815240506511,
+          "sd": 5397.763792529876,
+          "min": -15485.362595405215,
+          "max": 382.2358490251047
+        },
+        "steps": {
+          "mean": 1448.5555555555557,
+          "median": 1686.0,
+          "sd": 457.4018205001215,
+          "min": 729,
+          "max": 1875
+        },
+        "duration_s": {
+          "mean": 231.76888888888888,
+          "median": 269.76,
+          "sd": 73.18429128001945,
+          "min": 116.64,
+          "max": 300.0
+        },
+        "distance_m": {
+          "mean": 28.346165239777218,
+          "median": 29.170673744001355,
+          "sd": 7.67318364245419,
+          "min": 17.279247173886404,
+          "max": 46.84152114903492
+        },
+        "avg_speed_m_s": {
+          "mean": 0.12697200281511936,
+          "median": 0.12804342587586434,
+          "sd": 0.023093292720845655,
+          "min": 0.08803092266595038,
+          "max": 0.163229498018657
+        },
+        "best_success_s": 116.64,
+        "mean_success_s": 163.5377777777778,
+        "final_5_reward": 253.29829503192516
+      }
+    }
+  },
+  "memory": {
+    "q_learning": {
+      "states": 888,
+      "theoretical_states": 7776,
+      "coverage_percent": 11.419753086419753,
+      "visit_total": 37766,
+      "visit_mean": 42.52927927927928,
+      "visit_median": 5.0,
+      "visits_0": 1,
+      "visits_1_to_5": 461,
+      "visits_6_to_20": 221,
+      "visits_over_20": 205,
+      "weight_bytes": 21312,
+      "file_bytes": 86357
+    },
+    "drl": {
+      "parameters": 18950,
+      "trainable_architecture_parameters": 18950,
+      "observation": 12,
+      "weight_bytes": 75800,
+      "replay_allocated_bytes": 11600000,
+      "replay_bytes_per_item": 116,
+      "replay_capacity": 100000,
+      "file_bytes": 333665,
+      "checkpoint_bytes": {
+        "checkpoint_latest.pt": 6390765,
+        "best_model.pt": 331937,
+        "target_network.pt": 79693,
+        "last_model.pt": 333665
+      }
+    }
+  },
+  "benchmark": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "logical_cpu": 0,
+    "torch_threads": 1,
+    "decisions_per_batch": 1024,
+    "batches": 21,
+    "python": "3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:19:41) [GCC 14.3.0]",
+    "torch": "2.15.0+cpu",
+    "platform": "Linux-7.0.0-43-generic-x86_64-with-glibc2.39",
+    "scope": "Frozen six-Q-value scoring only. Inputs pre-encoded. No LiDAR, masking, argmax, or physics.",
+    "latency_us": {
+      "q_learning": {
+        "raw": [
+          0.10898046875,
+          0.058259765625,
+          0.0576611328125,
+          0.0558623046875,
+          0.054236328125,
+          0.1188857421875,
+          0.11483984375,
+          0.05691796875,
+          0.053771484375,
+          0.1424521484375,
+          0.09573828125,
+          0.054619140625,
+          0.052392578125,
+          0.0555859375,
+          0.0528134765625,
+          0.05689453125,
+          0.061861328125,
+          0.0788056640625,
+          0.0548466796875,
+          0.0571162109375,
+          0.0553193359375
+        ],
+        "median": 0.05691796875,
+        "mean": 0.0713266834077381,
+        "sd": 0.02733502345685971,
+        "minimum": 0.052392578125,
+        "maximum": 0.1424521484375
+      },
+      "drl": {
+        "raw": [
+          24.9890068359375,
+          30.48540234375,
+          25.730734375,
+          26.193947265625,
+          25.333470703125,
+          45.648724609375,
+          24.6191396484375,
+          25.505658203125,
+          25.390013671875,
+          39.123654296875,
+          25.89026953125,
+          25.2441142578125,
+          25.5704423828125,
+          25.2579091796875,
+          25.804640625,
+          25.8898720703125,
+          25.5838486328125,
+          25.1701103515625,
+          25.605755859375,
+          25.4944423828125,
+          25.448533203125
+        ],
+        "median": 25.5704423828125,
+        "mean": 27.3323662109375,
+        "sd": 5.235398689496276,
+        "minimum": 24.6191396484375,
+        "maximum": 45.648724609375
+      }
+    }
+  },
+  "comparability": "PARTIALLY MATCHED",
+  "train_initial_headings_equal": 1,
+  "evaluation_pairs_both_success": 9
+}

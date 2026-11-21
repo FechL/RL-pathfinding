@@ -1,0 +1,81 @@
+test_actions_are_real_velocities_with_simultaneous_turning (test_continuous.ContinuousTests.test_actions_are_real_velocities_with_simultaneous_turning) ... ok
+test_exact_arc_motion (test_continuous.ContinuousTests.test_exact_arc_motion) ... ok
+test_numpy_actor_validates_map_and_config (test_continuous.ContinuousTests.test_numpy_actor_validates_map_and_config) ... ok
+test_observations_change_with_heading_and_velocity (test_continuous.ContinuousTests.test_observations_change_with_heading_and_velocity) ... ok
+test_slew_and_speed_limits (test_continuous.ContinuousTests.test_slew_and_speed_limits) ... ok
+test_vectorized_collision_matches_reference (test_continuous.ContinuousTests.test_vectorized_collision_matches_reference) ... ok
+test_wheels_approach_small_targets_without_a_step (test_continuous.ContinuousTests.test_wheels_approach_small_targets_without_a_step) ... ok
+test_collision_terminates_without_teleporting (test_continuous.EnvironmentTests.test_collision_terminates_without_teleporting) ... ok
+test_export_matches_sac_actor (test_continuous.EnvironmentTests.test_export_matches_sac_actor) ... WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1795266867.230710       2 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1795266867.276092       2 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1795266868.633336       2 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+/home/rafli/.config/matplotlib is not a writable directory
+Matplotlib created a temporary cache directory at /tmp/matplotlib-5oc0fmhe because there was an issue with the default path (/home/rafli/.config/matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+ok
+test_goal_termination (test_continuous.EnvironmentTests.test_goal_termination) ... ok
+test_gym_api (test_continuous.EnvironmentTests.test_gym_api) ... ok
+test_included_continuous_actor_completes_mission (test_continuous.EnvironmentTests.test_included_continuous_actor_completes_mission) ... ERROR
+test_time_limit_is_truncation (test_continuous.EnvironmentTests.test_time_limit_is_truncation) ... ok
+test_unguided_environment_uses_euclidean_progress_without_graph (test_continuous.EnvironmentTests.test_unguided_environment_uses_euclidean_progress_without_graph) ... ok
+test_unguided_fixed_resets_use_exact_start (test_continuous.EnvironmentTests.test_unguided_fixed_resets_use_exact_start) ... ok
+test_unguided_motion_can_approach_wall_until_contact (test_continuous.EnvironmentTests.test_unguided_motion_can_approach_wall_until_contact) ... ok
+test_double_target_uses_online_choice_and_terminal_bit (test_lidar_dqn.DQNTests.test_double_target_uses_online_choice_and_terminal_bit) ... ok
+test_encoder_and_velocity (test_lidar_dqn.DQNTests.test_encoder_and_velocity) ... ok
+test_forward_and_backward (test_lidar_dqn.DQNTests.test_forward_and_backward) ... ok
+test_lidar_mask_fallback (test_lidar_dqn.DQNTests.test_lidar_mask_fallback) ... ok
+test_mask_applies_to_greedy_and_epsilon (test_lidar_dqn.DQNTests.test_mask_applies_to_greedy_and_epsilon) ... ok
+test_optimizer_target_sync_save_load_resume (test_lidar_dqn.DQNTests.test_optimizer_target_sync_save_load_resume) ... ok
+test_original_collision_and_recovery (test_lidar_dqn.DQNTests.test_original_collision_and_recovery) ... ok
+test_real_maze_timeout_and_deterministic_evaluation (test_lidar_dqn.DQNTests.test_real_maze_timeout_and_deterministic_evaluation) ... ok
+test_replay_wrap_and_sample (test_lidar_dqn.DQNTests.test_replay_wrap_and_sample) ... ok
+test_continuous_greedy_action_maximizes_q (test_naf.NafTests.test_continuous_greedy_action_maximizes_q) ... ok
+test_numpy_export_matches_greedy_network (test_naf.NafTests.test_numpy_export_matches_greedy_network) ... ok
+test_terminal_target_cuts_bootstrap (test_naf.NafTests.test_terminal_target_cuts_bootstrap) ... ok
+test_cylinder_has_circular_footprint (test_planner.PlannerTests.test_cylinder_has_circular_footprint) ... ok
+test_endpoints_outside_arena_or_inside_wall_fail (test_planner.PlannerTests.test_endpoints_outside_arena_or_inside_wall_fail) ... ok
+test_exact_goal_and_short_motion (test_planner.PlannerTests.test_exact_goal_and_short_motion) ... ok
+test_no_route_terminates_with_finite_search (test_planner.PlannerTests.test_no_route_terminates_with_finite_search) ... ok
+test_reverse_and_alternative_maze_routes (test_planner.PlannerTests.test_reverse_and_alternative_maze_routes) ... ok
+test_segment_cannot_tunnel_through_a_box (test_planner.PlannerTests.test_segment_cannot_tunnel_through_a_box) ... ok
+test_small_start_goal_variations (test_planner.PlannerTests.test_small_start_goal_variations) ... ok
+test_start_to_center_goal_route_is_safe (test_planner.PlannerTests.test_start_to_center_goal_route_is_safe) ... ok
+test_continuous_positions_are_not_snapped_to_centres (test_q_learning.QLearningTests.test_continuous_positions_are_not_snapped_to_centres) ... ok
+test_saved_policy_reaches_goal_and_all_segments_are_safe (test_q_learning.QLearningTests.test_saved_policy_reaches_goal_and_all_segments_are_safe) ... ERROR
+test_stale_map_policy_is_rejected (test_q_learning.QLearningTests.test_stale_map_policy_is_rejected) ... ok
+test_swept_motion_cannot_jump_through_thin_wall (test_q_learning.QLearningTests.test_swept_motion_cannot_jump_through_thin_wall) ... ok
+test_terminal_target_does_not_bootstrap (test_q_learning.QLearningTests.test_terminal_target_does_not_bootstrap) ... ok
+test_truncation_keeps_bootstrap (test_q_learning.QLearningTests.test_truncation_keeps_bootstrap) ... ok
+test_checkpoint_exact_duplicates_only (test_training_plots.TrainingPlotTests.test_checkpoint_exact_duplicates_only) ... ok
+test_historic_monitor_does_not_invent_success (test_training_plots.TrainingPlotTests.test_historic_monitor_does_not_invent_success) ... ok
+test_monitor_records_real_success_and_collision (test_training_plots.TrainingPlotTests.test_monitor_records_real_success_and_collision) ... ok
+test_rolling_window_uses_available_history (test_training_plots.TrainingPlotTests.test_rolling_window_uses_available_history) ... ok
+
+======================================================================
+ERROR: test_included_continuous_actor_completes_mission (test_continuous.EnvironmentTests.test_included_continuous_actor_completes_mission)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/rafli/Project/RL-pathfinding/tests/test_continuous.py", line 175, in test_included_continuous_actor_completes_mission
+    actor,_=read_policy(ROOT/'models/continuous_actor.json',nav)
+            ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/rafli/Project/RL-pathfinding/controllers/micromouse/continuous_control.py", line 335, in read_policy
+    raise ValueError(f'Incompatible continuous policy ({key}); retrain it')
+ValueError: Incompatible continuous policy (signature); retrain it
+
+======================================================================
+ERROR: test_saved_policy_reaches_goal_and_all_segments_are_safe (test_q_learning.QLearningTests.test_saved_policy_reaches_goal_and_all_segments_are_safe)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/rafli/Project/RL-pathfinding/tests/test_q_learning.py", line 40, in test_saved_policy_reaches_goal_and_all_segments_are_safe
+    env=read_world();q,_=load_policy(ROOT/'models/q_learning.json',env)
+                         ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/rafli/Project/RL-pathfinding/controllers/micromouse/q_learning.py", line 168, in load_policy
+    raise ValueError('Policy is incompatible with this scene; rerun tools/train_q_learning.py')
+ValueError: Policy is incompatible with this scene; rerun tools/train_q_learning.py
+
+----------------------------------------------------------------------
+Ran 46 tests in 26.276s
+
+FAILED (errors=2)

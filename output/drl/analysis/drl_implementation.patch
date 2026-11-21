@@ -1,0 +1,1301 @@
+diff --git a/README.md b/README.md
+index 50df9ba..14beadc 100644
+--- a/README.md
++++ b/README.md
+@@ -86,6 +86,27 @@ tempuh hanya dihitung dari percobaan yang mencapai goal. Hasil ini mengukur
+ kontrol gerak pada rute tetap. Pencarian rute dan fisika Webots perlu
+ dievaluasi terpisah.
+ 
++## Double DQN dengan LiDAR
++
++`dqn` memakai observasi kontinu, enam aksi diskret, dan penyaringan LiDAR
++baik saat memilih aksi maupun menghitung target Q. DFS tetap menghasilkan
++target lokal. Training, evaluasi greedy, dan uji waktu dengan bobot beku
++menghasilkan artefak di `output/drl/`. Konfigurasi dapat diubah melalui
++`configs/lidar_dqn.json` atau file JSON yang diberikan dengan `--config`.
++
++```bash
++bash run.sh train --algorithm dqn --output output/drl-new
++.venv/bin/python tools/evaluate_lidar_dqn.py --checkpoint output/drl-new/models/last_model.pt --output output/drl-eval
++.venv/bin/python tools/analyze_lidar_dqn.py --output output/drl-new
++.venv/bin/python tools/export_lidar_dqn.py --checkpoint output/drl-new/models/last_model.pt --output output/drl-new/models/webots_model.json
++bash run.sh sim --algorithm dqn --fast --policy output/drl-new/models/webots_model.json
++```
++
++Gunakan `--stop-after-episodes` untuk berhenti pada batas episode, lalu
++`--resume <run>/models/checkpoint_latest.pt` dengan konfigurasi run yang sama.
++Untuk protokol, metrik, dan detail checkpoint, lihat
++`output/drl/analysis/drl_architecture.md`.
++
+ ## Optional legacy continuous SAC
+ 
+ Older continuous SAC modes remain available by selecting `hidden_goal`, `sac`
+diff --git a/controllers/micromouse/micromouse.py b/controllers/micromouse/micromouse.py
+index 56b6e66..0888570 100644
+--- a/controllers/micromouse/micromouse.py
++++ b/controllers/micromouse/micromouse.py
+@@ -161,6 +161,10 @@ def main():
+         raise SystemExit("Use the built-in Webots controller API through bash run.sh.") from error
+ 
+     algorithm = os.environ.get("MICROMOUSE_ALGORITHM", "q_learning")
++    if algorithm == "dqn":
++        from lidar_dqn_webots import run
++        run(Supervisor())
++        return
+     if algorithm in ("q_learning", "drl"):
+         from lidar_q_webots import run
+         run(Supervisor(), drl=algorithm == "drl")
+diff --git a/run.sh b/run.sh
+index 1f35edf..29460a6 100755
+--- a/run.sh
++++ b/run.sh
+@@ -16,6 +16,10 @@ case "$mode" in
+         if [[ "$mode" == "train" ]]; then
+             if [[ "${1:-}" == "--algorithm" ]]; then
+                 case "${2:-}" in
++                    dqn)
++                        shift 2
++                        exec "$training_python" "$project_dir/tools/train_lidar_dqn.py" "$@"
++                        ;;
+                     q_learning|lidar_q)
+                         shift 2
+                         exec "$training_python" "$project_dir/tools/train_lidar_q.py" --render "$@"
+@@ -64,6 +68,8 @@ case "$mode" in
+         echo "bash run.sh train --algorithm rl    Training SAC continuous sensor goal (legacy)"
+         echo "bash run.sh train --algorithm naf   Training continuous NAF baseline"
+         echo "bash run.sh train --algorithm drl   Training SAC dengan pencarian LiDAR"
++        echo "bash run.sh train --algorithm dqn   Training Double DQN dengan LiDAR"
++        echo "bash run.sh sim --algorithm dqn --fast  Inferensi Double DQN di Webots"
+         echo "bash run.sh sim --algorithm drl --fast  Simulasi hasil training DRL"
+         echo "bash run.sh compare --help          Bandingkan Q-learning dan DRL"
+         echo "bash run.sh sim --algorithm naf     Jalankan hasil NAF di Webots"
+@@ -87,7 +93,7 @@ case "$mode" in
+                 --best-route) export MICROMOUSE_BEST_ROUTE=1; shift ;;
+                 --algorithm)
+                     case "${2:-}" in
+-                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|drl|astar)
++                        hidden_goal|rl|naf|sac|rl_unguided|q_learning|drl|dqn|astar)
+                             if [[ "$2" == "rl" ]]; then
+                                 export MICROMOUSE_ALGORITHM=hidden_goal
+                             else
+diff --git a/tools/lidar_drl_env.py b/tools/lidar_drl_env.py
+index c5f0e50..6a902d4 100644
+--- a/tools/lidar_drl_env.py
++++ b/tools/lidar_drl_env.py
+@@ -30,9 +30,12 @@ class LidarMission(gym.Env):
+         self.episode_index += 1
+         env.episode_index = self.episode_index
+         self.collision_count = 0
++        search_seed = mission.get('search_seed')
++        if search_seed is None:
++            search_seed = int(self.np_random.integers(2**32))
+         self.route_search = LidarMazeSearch(
+             env.base_start, env.base_goal, env.nav.bounds, env.nav.cell_size,
+-            seed=int(self.np_random.integers(2**32)), replay=self.replay)
++            seed=search_seed, replay=self.replay)
+         self.target = None
+         self._select_target()
+         return self._observation(), {}
+diff --git a/configs/lidar_dqn.json b/configs/lidar_dqn.json
+new file mode 100644
+index 0000000..3027271
+--- /dev/null
++++ b/configs/lidar_dqn.json
+@@ -0,0 +1,21 @@
++{
++  "episodes": 36,
++  "timeout": 300.0,
++  "evaluation_runs": 12,
++  "seed": 42,
++  "learning_rate": 0.001,
++  "gamma": 0.98,
++  "capacity": 100000,
++  "batch_size": 64,
++  "warmup": 1000,
++  "epsilon_start": 1.0,
++  "epsilon_min": 0.05,
++  "epsilon_decay_fraction": 0.6,
++  "target_interval": 1000,
++  "gradient_clip": 10.0,
++  "hidden": [128, 128],
++  "update_every": 1,
++  "checkpoint_every": 5,
++  "speed_trials": 3,
++  "device": "cpu"
++}
+diff --git a/controllers/micromouse/lidar_dqn.py b/controllers/micromouse/lidar_dqn.py
+new file mode 100644
+index 0000000..347854e
+--- /dev/null
++++ b/controllers/micromouse/lidar_dqn.py
+@@ -0,0 +1,65 @@
++"""Continuous observations and action constraints shared by DQN runtimes."""
++import math
++
++import numpy as np
++
++from lidar_qlearning import ACTION_NAMES, ACTION_VW, STOP_ACTION, safe_actions, waypoint_bearing
++
++FEATURES = (
++    'bearing_sin', 'bearing_cos', 'target_distance_over_arena_diagonal',
++    'front', 'front_left', 'left', 'right', 'front_right',
++    'linear_speed', 'yaw_rate', 'scanning', 'collision_recovery',
++)
++NUM_ACTIONS = len(ACTION_NAMES)
++LIDAR_RANGE = 4.
++
++
++def action_mask(allowed):
++    mask = np.zeros(NUM_ACTIONS, dtype=bool)
++    mask[list(allowed)] = True
++    if not mask.any():
++        mask[STOP_ACTION] = True
++    return mask
++
++
++def get_action_mask(observation):
++    """Physical mask from the five normalized forward-sector minima."""
++    obs = np.asarray(observation)
++    if obs.shape != (len(FEATURES),) or not np.isfinite(obs).all():
++        raise ValueError('Expected one finite DQN observation.')
++    if obs[-1]:
++        return action_mask((STOP_ACTION,))
++    return action_mask(safe_actions(obs[3:8] * LIDAR_RANGE))
++
++
++def encode_observation(pose, target, sectors, wheels, config, distance_scale, *, recovering=False):
++    pose = np.asarray(pose)
++    sectors = np.asarray(sectors)
++    wheels = np.asarray(wheels)
++    if pose.shape != (3,) or sectors.shape != (5,) or wheels.shape != (2,):
++        raise ValueError('Expected 3 pose, 5 LiDAR, and 2 wheel measurements.')
++    if not all(np.isfinite(x).all() for x in (pose, sectors, wheels)):
++        raise ValueError('Nonfinite DQN sensor input.')
++    if not math.isfinite(distance_scale) or distance_scale <= 0:
++        raise ValueError('Distance scale must be finite and positive.')
++    if target is None:
++        relative = (0., 0., 0.)
++    else:
++        bearing = waypoint_bearing(pose, target)
++        relative = (math.sin(bearing), math.cos(bearing),
++                    min(1., math.dist(pose[:2], target) / distance_scale))
++    left, right = wheels / config.wheel_limit
++    result = np.array([
++        *relative, *np.clip(sectors / LIDAR_RANGE, 0., 1.),
++        np.clip((left + right) / 2, -1., 1.), np.clip((right - left) / 2, -1., 1.),
++        float(target is None), float(recovering),
++    ], dtype=np.float32)
++    if not np.isfinite(result).all():
++        raise ValueError('Nonfinite DQN observation.')
++    return result
++
++
++def schema():
++    return dict(observation=list(FEATURES),
++                actions=[dict(name=name, velocity=list(velocity))
++                         for name, velocity in zip(ACTION_NAMES, ACTION_VW)])
+diff --git a/controllers/micromouse/lidar_dqn_agent.py b/controllers/micromouse/lidar_dqn_agent.py
+new file mode 100644
+index 0000000..934dfb0
+--- /dev/null
++++ b/controllers/micromouse/lidar_dqn_agent.py
+@@ -0,0 +1,116 @@
++"""Masked Double DQN updates, deterministic inference, and resume state."""
++from pathlib import Path
++
++import numpy as np
++import torch
++from torch import nn
++
++from lidar_dqn import schema
++from lidar_dqn_network import QNetwork
++from lidar_dqn_replay import ReplayBuffer
++
++VERSION = 1
++
++
++def double_dqn_target(online_values, target_values, mask, reward, terminated, gamma):
++    """Online selects the safe action, target evaluates that same action."""
++    action = online_values.masked_fill(~mask, -torch.inf).argmax(dim=1, keepdim=True)
++    estimate = target_values.gather(1, action).squeeze(1)
++    return reward + gamma * torch.where(terminated, torch.zeros_like(estimate), estimate)
++
++
++def atomic_save(data, path):
++    path = Path(path)
++    temp = path.with_suffix(path.suffix + '.tmp')
++    torch.save(data, temp)
++    temp.replace(path)
++
++
++def read_checkpoint(path, device='cpu'):
++    saved = torch.load(path, map_location=device, weights_only=True)
++    if saved.get('version') != VERSION or saved.get('schema') != schema():
++        raise ValueError('Incompatible Double DQN checkpoint schema.')
++    return saved
++
++
++def load_inference(path):
++    saved = read_checkpoint(path)
++    network = QNetwork(saved['config']['hidden'])
++    network.load_state_dict(saved['online'])
++    return network.eval().requires_grad_(False), saved
++
++
++class DQNAgent:
++    def __init__(self, config):
++        self.config = config.copy()
++        self.device = torch.device(config['device'])
++        torch.manual_seed(config['seed'])
++        self.rng = np.random.default_rng(config['seed'])
++        self.online = QNetwork(config['hidden']).to(self.device)
++        self.target = QNetwork(config['hidden']).to(self.device)
++        self.target.load_state_dict(self.online.state_dict())
++        self.target.eval().requires_grad_(False)
++        self.optimizer = torch.optim.Adam(self.online.parameters(), lr=config['learning_rate'])
++        self.replay = ReplayBuffer(config['capacity'])
++        self.updates = self.target_updates = 0
++
++    @torch.no_grad()
++    def values(self, state):
++        return self.online(torch.as_tensor(state, device=self.device)).cpu().numpy()
++
++    def choose(self, state, mask, epsilon):
++        valid = np.flatnonzero(mask)
++        if not len(valid):
++            raise ValueError('Action mask has no fallback.')
++        if len(valid) == 1:
++            return int(valid[0])
++        if epsilon and self.rng.random() < epsilon:
++            return int(self.rng.choice(valid))
++        return int(valid[np.argmax(self.values(state)[valid])])
++
++    def update(self):
++        cfg = self.config
++        if self.replay.size < max(cfg['warmup'], cfg['batch_size']):
++            return None
++        data = self.replay.sample(cfg['batch_size'], self.rng, self.device)
++        q = self.online(data['state'])
++        chosen = q.gather(1, data['action'][:, None]).squeeze(1)
++        with torch.no_grad():
++            target = double_dqn_target(
++                self.online(data['next_state']), self.target(data['next_state']),
++                data['next_mask'], data['reward'], data['terminated'], cfg['gamma'])
++        loss = nn.functional.smooth_l1_loss(chosen, target)
++        if not torch.isfinite(loss):
++            raise FloatingPointError('Nonfinite DQN loss.')
++        self.optimizer.zero_grad(set_to_none=True)
++        loss.backward()
++        nn.utils.clip_grad_norm_(self.online.parameters(), cfg['gradient_clip'], error_if_nonfinite=True)
++        self.optimizer.step()
++        self.updates += 1
++        if self.updates % cfg['target_interval'] == 0:
++            self.target.load_state_dict(self.online.state_dict())
++            self.target_updates += 1
++        return float(loss.detach()), float(q.detach().mean()), float(q.detach().max())
++
++    def save(self, path, progress, *, full=False):
++        data = dict(version=VERSION, schema=schema(), config=self.config,
++                    online=self.online.state_dict(), target=self.target.state_dict(),
++                    optimizer=self.optimizer.state_dict(), progress=progress,
++                    updates=self.updates, target_updates=self.target_updates)
++        if full:
++            data.update(replay=self.replay.state_dict(), rng=self.rng.bit_generator.state,
++                        torch_rng=torch.random.get_rng_state())
++        atomic_save(data, path)
++
++    def resume(self, path):
++        saved = read_checkpoint(path, self.device)
++        if saved['config'] != self.config or 'replay' not in saved:
++            raise ValueError('Resume requires the full checkpoint and its original configuration.')
++        self.online.load_state_dict(saved['online'])
++        self.target.load_state_dict(saved['target'])
++        self.optimizer.load_state_dict(saved['optimizer'])
++        self.replay.load_state_dict(saved['replay'])
++        self.rng.bit_generator.state = saved['rng']
++        torch.random.set_rng_state(saved['torch_rng'].cpu())
++        self.updates, self.target_updates = saved['updates'], saved['target_updates']
++        return saved['progress']
+diff --git a/controllers/micromouse/lidar_dqn_network.py b/controllers/micromouse/lidar_dqn_network.py
+new file mode 100644
+index 0000000..b121fce
+--- /dev/null
++++ b/controllers/micromouse/lidar_dqn_network.py
+@@ -0,0 +1,19 @@
++"""PyTorch action-value network for discrete Micromouse motor actions."""
++from torch import nn
++
++from lidar_dqn import FEATURES, NUM_ACTIONS
++
++
++class QNetwork(nn.Module):
++    def __init__(self, hidden=(128, 128)):
++        super().__init__()
++        sizes = (len(FEATURES), *hidden, NUM_ACTIONS)
++        layers = []
++        for index, (inputs, outputs) in enumerate(zip(sizes, sizes[1:])):
++            layers.append(nn.Linear(inputs, outputs))
++            if index < len(sizes) - 2:
++                layers.append(nn.ReLU())
++        self.layers = nn.Sequential(*layers)
++
++    def forward(self, observation):
++        return self.layers(observation)
+diff --git a/controllers/micromouse/lidar_dqn_replay.py b/controllers/micromouse/lidar_dqn_replay.py
+new file mode 100644
+index 0000000..7b8d2dc
+--- /dev/null
++++ b/controllers/micromouse/lidar_dqn_replay.py
+@@ -0,0 +1,51 @@
++"""Bounded replay storage with explicit terminal, truncation, and action mask."""
++import numpy as np
++import torch
++
++from lidar_dqn import FEATURES, NUM_ACTIONS
++
++
++class ReplayBuffer:
++    def __init__(self, capacity):
++        self.capacity = capacity
++        self.size = self.cursor = 0
++        self.arrays = dict(
++            state=np.empty((capacity, len(FEATURES)), dtype=np.float32),
++            action=np.empty(capacity, dtype=np.int64),
++            reward=np.empty(capacity, dtype=np.float32),
++            next_state=np.empty((capacity, len(FEATURES)), dtype=np.float32),
++            terminated=np.empty(capacity, dtype=bool),
++            truncated=np.empty(capacity, dtype=bool),
++            next_mask=np.empty((capacity, NUM_ACTIONS), dtype=bool),
++        )
++
++    def push(self, state, action, reward, next_state, terminated, truncated, next_mask):
++        if not 0 <= action < NUM_ACTIONS or not np.isfinite(reward):
++            raise ValueError('Invalid action or reward in replay.')
++        if not np.isfinite(state).all() or not np.isfinite(next_state).all():
++            raise ValueError('Nonfinite replay observation.')
++        if not np.asarray(next_mask).any():
++            raise ValueError('Missing next action fallback.')
++        values = (state, action, reward, next_state, terminated, truncated, next_mask)
++        for array, value in zip(self.arrays.values(), values):
++            array[self.cursor] = value
++        self.cursor = (self.cursor + 1) % self.capacity
++        self.size = min(self.size + 1, self.capacity)
++
++    def sample(self, batch_size, rng, device):
++        indices = rng.choice(self.size, size=batch_size, replace=False)
++        return {key: torch.as_tensor(values[indices], device=device)
++                for key, values in self.arrays.items()}
++
++    def state_dict(self):
++        return dict(cursor=self.cursor, size=self.size,
++                    arrays={key: torch.from_numpy(value[:self.size].copy())
++                            for key, value in self.arrays.items()})
++
++    def load_state_dict(self, data):
++        size, cursor = data['size'], data['cursor']
++        if not 0 <= size <= self.capacity or not 0 <= cursor < self.capacity:
++            raise ValueError('Replay does not fit checkpoint capacity.')
++        for key, array in self.arrays.items():
++            array[:size] = data['arrays'][key].cpu().numpy()
++        self.size, self.cursor = size, cursor
+diff --git a/controllers/micromouse/lidar_dqn_webots.py b/controllers/micromouse/lidar_dqn_webots.py
+new file mode 100644
+index 0000000..9fde290
+--- /dev/null
++++ b/controllers/micromouse/lidar_dqn_webots.py
+@@ -0,0 +1,166 @@
++"""Frozen Double DQN controller for Webots, using exported checkpoint weights."""
++import json
++import math
++import os
++from pathlib import Path
++
++import numpy as np
++
++from continuous_control import ControlConfig
++from lidar_dqn import FEATURES, NUM_ACTIONS, action_mask, encode_observation, get_action_mask, schema
++from lidar_q_env import COLLISION_RECOVERY_SECONDS, COLLISION_RECOVERY_SPEED, GOAL_TOLERANCE, WAYPOINT_TOLERANCE
++from lidar_qlearning import ACTION_VW, WaypointRecovery, aggregate_point_cloud
++from maze_search import LidarMazeSearch
++from planner import path_length, physical_clearance
++from q_learning import ContinuousMaze, scene_signature
++
++
++def load_export(path):
++    payload = json.loads(Path(path).read_text())
++    if (payload.get('algorithm'),payload.get('version'),payload.get('schema')) != ('masked_double_dqn',1,schema()):
++        raise ValueError('Incompatible DQN export.')
++    layers = [(np.asarray(layer['weight'],dtype=np.float32),
++               np.asarray(layer['bias'],dtype=np.float32)) for layer in payload['layers']]
++    inputs = len(FEATURES)
++    for weights,bias in layers:
++        if (weights.ndim!=2 or weights.shape[1]!=inputs or bias.shape!=(weights.shape[0],)
++                or not np.isfinite(weights).all() or not np.isfinite(bias).all()):
++            raise ValueError('Invalid exported layer.')
++        inputs = weights.shape[0]
++    if not layers or inputs!=NUM_ACTIONS:
++        raise ValueError('DQN export must produce six Q values.')
++
++    def predict(obs):
++        for index,(weights,bias) in enumerate(layers):
++            obs = weights @ obs + bias
++            if index+1<len(layers):
++                obs = np.maximum(obs,0.)
++        return obs
++
++    return predict, payload
++
++
++def run(supervisor):
++    from micromouse import MapView, PROJECT, read_scene
++    period = int(supervisor.getBasicTimeStep())
++    dt = period / 1000
++    if supervisor.step(period) == -1:
++        return
++    robot,goal,walls,bounds,cell_size = read_scene(supervisor)
++    start = tuple(robot.getField('translation').getSFVec3f()[:2])
++    signature = scene_signature(ContinuousMaze(start,goal,walls,bounds,cell_size))
++    path = Path(os.environ.get('MICROMOUSE_POLICY', str(PROJECT/'output/drl/models/webots_model.json')))
++    predict, payload = load_export(path)
++    if payload['maze_signature'] != signature:
++        raise ValueError('DQN export belongs to a different maze.')
++    gps, imu, lidar = [supervisor.getDevice(name) for name in ('gps','imu','lidar')]
++    encoders = [supervisor.getDevice(f'{side} wheel sensor') for side in ('left','right')]
++    motors = [supervisor.getDevice(f'{side} wheel motor') for side in ('left','right')]
++    for sensor in (gps,imu,lidar,*encoders):
++        sensor.enable(period)
++    lidar.enablePointCloud()
++    if not math.isclose(lidar.getFov(),math.pi,rel_tol=1e-5):
++        raise ValueError('DQN expects the front-facing LiDAR.')
++    for motor in motors:
++        motor.setPosition(math.inf)
++        motor.setVelocity(0.)
++    for _ in range(4):
++        if supervisor.step(period)==-1:
++            return
++    seed = int(os.environ.get('MICROMOUSE_SEARCH_SEED','0'))
++    timeout = float(os.environ.get('MICROMOUSE_TIMEOUT_S','300'))
++    if not math.isfinite(timeout) or timeout <= 0:
++        raise ValueError('MICROMOUSE_TIMEOUT_S must be positive and finite.')
++    search = LidarMazeSearch(start,goal,bounds,cell_size,seed=seed)
++    distance_scale = math.hypot(bounds[1]-bounds[0],bounds[3]-bounds[2])
++    show = os.environ.get('MICROMOUSE_NO_GUI')!='1' and bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
++    view = MapView(start,goal,walls,bounds,[],set(),cell_size,show,'LiDAR Double DQN') if show else None
++    config = ControlConfig()
++    position = np.array([encoder.getValue() for encoder in encoders])
++    commands = np.zeros(2)
++    velocity = (0.,0.)
++    target = None
++    recovery = WaypointRecovery()
++    elapsed_start = supervisor.getTime()
++    next_decision = 0.
++    contact_until = 0.
++    latched = False
++    collisions = 0
++    clearance = math.inf
++    trajectory, decisions = [], []
++    status = 'interrupted'
++    while supervisor.step(period)!=-1:
++        elapsed = supervisor.getTime()-elapsed_start
++        pose = np.array([*gps.getValues()[:2],imu.getRollPitchYaw()[2]])
++        trajectory.append(pose[:2].tolist())
++        new_position = np.array([encoder.getValue() for encoder in encoders])
++        wheels, position = (new_position-position)/dt, new_position
++        contact = physical_clearance(pose[:2],walls,bounds)
++        clearance = min(clearance,contact)
++        if elapsed >= contact_until and contact >= .003:
++            latched = False
++        if elapsed >= contact_until and contact < -.002:
++            collisions += int(not latched)
++            latched = True
++            contact_until = elapsed + COLLISION_RECOVERY_SECONDS
++            recovery.active = True
++        backing = elapsed < contact_until
++        if not backing and search.final and math.dist(pose[:2],goal)<=GOAL_TOLERANCE:
++            status = 'success'
++            break
++        if elapsed >= timeout:
++            status = 'timeout'
++            break
++        if backing:
++            rear = pose[:2]-.035*np.array([math.cos(pose[2]),math.sin(pose[2])])
++            safe = physical_clearance(rear,walls,bounds) >= min(0.,contact)-.001
++            velocity = (COLLISION_RECOVERY_SPEED if safe else 0.,0.)
++            next_decision = 0.
++        else:
++            reached = target is not None and not search.final and math.dist(pose[:2],target)<=WAYPOINT_TOLERANCE
++            if elapsed+1e-8 >= next_decision or reached:
++                points = lidar.getPointCloud()
++                sectors = aggregate_point_cloud(points)
++                if target is None or reached:
++                    target = search.next_target(pose,[(point.x,point.y) for point in points])
++                    recovery = WaypointRecovery()
++                obs = encode_observation(pose,target,sectors,wheels,config,distance_scale)
++                if target is None:
++                    if search.scan_bearing is None:
++                        status = 'search_exhausted'
++                        break
++                    mask = action_mask((search.scan_action(sectors),))
++                else:
++                    mask = get_action_mask(obs) & action_mask(recovery.actions(pose,target,sectors,elapsed))
++                q = predict(obs)
++                if not np.isfinite(q).all():
++                    raise FloatingPointError('Nonfinite Webots Q values.')
++                action = int(np.where(mask,q,-np.inf).argmax())
++                velocity = ACTION_VW[action]
++                decisions.append(dict(time_s=elapsed,observation=obs.tolist(),mask=mask.tolist(),
++                                      q=q.tolist(),action=action,target=target))
++                next_decision = elapsed+.16
++                if view:
++                    view.update(pose[:2],pose[2],trajectory,lidar_points=points)
++        commands = config.wheels_for_velocity(*velocity,commands,dt)
++        for motor, command in zip(motors,commands):
++            motor.setVelocity(float(command))
++    for motor in motors:
++        motor.setVelocity(0.)
++    output = Path(os.environ.get('MICROMOUSE_RESULTS_DIR',str(PROJECT/'output/drl/data/webots')))
++    output.mkdir(parents=True,exist_ok=True)
++    result = dict(algorithm='masked_double_dqn',status=status,seed=seed,
++                  checkpoint_sha256=payload['checkpoint_sha256'],start=start,goal=goal,
++                  simulation_duration_s=supervisor.getTime()-elapsed_start,
++                  collision_count=collisions, travelled_length_m=path_length(trajectory),
++                  goal_error_m=math.dist(gps.getValues()[:2],goal),
++                  min_clearance_m=clearance if trajectory else None,
++                  trajectory=trajectory, decisions=decisions, targets=search.route)
++    filename = output/'latest_run.json'
++    filename.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
++    if view:
++        view.save(output/'map.png')
++        view.close()
++    print(f'DQN Webots: {status} | {result["simulation_duration_s"]:.2f}s | {filename}',flush=True)
++    if os.environ.get('MICROMOUSE_TEST_EXIT')=='1':
++        supervisor.simulationQuit(0)
+diff --git a/tools/analyze_lidar_dqn.py b/tools/analyze_lidar_dqn.py
+new file mode 100644
+index 0000000..5682416
+--- /dev/null
++++ b/tools/analyze_lidar_dqn.py
+@@ -0,0 +1,144 @@
++"""Generate measured training plots and an Indonesian experiment summary."""
++import argparse
++import csv
++import json
++from pathlib import Path
++import statistics
++
++from matplotlib.figure import Figure
++
++
++def read_json(path):
++    return json.loads(path.read_text())
++
++
++def rolling(samples, window=5):
++    return [statistics.mean(samples[max(0,i-window+1):i+1]) for i in range(len(samples))]
++
++
++def render(path, title, x_label, y_label, draw, source='training.csv'):
++    figure = Figure(figsize=(7,3.1),layout='constrained')
++    ax = figure.subplots()
++    draw(ax)
++    ax.set(title=title,xlabel=x_label,ylabel=y_label)
++    ax.grid(alpha=.18)
++    if ax.get_legend_handles_labels()[0]:
++        ax.legend(loc='best',fontsize=8)
++    figure.text(.01,.005,f'Sumber: {source}',fontsize=7,color='#505050')
++    figure.savefig(path,dpi=172)
++
++
++def main():
++    parser=argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output',type=Path,default=Path('output/drl'))
++    args=parser.parse_args()
++    data=args.output/'data'
++    figures=args.output/'graphs'
++    figures.mkdir(parents=True,exist_ok=True)
++    rows=list(csv.DictReader((data/'training.csv').read_text().splitlines()))
++    eps=[int(r['episode']) for r in rows]
++    config=read_json(data/'run.json')
++    summary=read_json(data/'summary.json')
++    routes=read_json(data/'routes.json')
++    if not rows:
++        raise ValueError('No full training episodes to plot.')
++    flag=lambda r,key:r[key]=='True'
++    numeric=lambda key:[float(row[key]) for row in rows]
++    reward=numeric('reward')
++
++    def line(filename,title,label,key):
++        samples=[(episode,float(row[key])) for episode,row in zip(eps,rows) if row[key]]
++        if samples:
++            x,y=zip(*samples)
++            render(figures/f'{filename}.png',title,'Episode',label,
++                   lambda ax:ax.plot(x,y,color='#2e6a85',label=label))
++
++    line('reward_per_episode','Reward akumulasi per episode','Reward','reward')
++    render(figures/'moving_average_reward.png','Reward dan rata-rata lima episode','Episode','Reward',
++           lambda ax:(ax.plot(eps,reward,color='#89a7b5',label='Reward episode'),
++                      ax.plot(eps,rolling(reward),color='#a84f33',label='Rata-rata 5 episode')))
++    line('steps_per_episode','Langkah kontrol per episode','Langkah','steps')
++    line('duration_per_episode','Durasi simulasi per episode','Detik simulasi','duration_s')
++    render(figures/'success_rate.png','Keberhasilan dalam jendela lima episode','Episode','Berhasil (%)',
++           lambda ax:ax.plot(eps,[100*r for r in rolling([flag(x,'success') for x in rows])],
++                             color='#31724d',label='Mencapai goal'))
++    render(figures/'collision_per_episode.png','Kejadian tabrakan per episode','Episode','Jumlah kejadian',
++           lambda ax:ax.bar(eps,numeric('collision_count'),color='#a44b45',label='Tabrakan tercatat'))
++    line('epsilon_decay','Nilai epsilon pada akhir episode','Epsilon','epsilon')
++    line('td_loss','Rata-rata Smooth L1 loss per episode','Loss','td_loss')
++
++    def q_values(ax):
++        for key,label,color in [('mean_q','Rata-rata Q','#3e7d97'),('max_q','Q maksimum','#cb7434')]:
++            x,y=zip(*[(episode,float(row[key])) for episode,row in zip(eps,rows) if row[key]])
++            ax.plot(x,y,color=color,label=label)
++
++    if any(row['mean_q'] for row in rows):
++        render(figures/'q_value_evolution.png','Nilai Q pada batch pembaruan','Episode','Nilai Q',q_values)
++    best=routes['best']
++    trials=routes['trials']
++    if trials:
++        def speed(ax):
++            for r in trials:
++                ax.scatter(r['route_id'],r['duration_s'],s=18,alpha=.62,
++                           color='#267258' if r['success'] else '#a54743',
++                           marker='o' if r['success'] else 'x')
++            ax.scatter([],[],color='#267258',label='Sukses')
++            ax.scatter([],[],color='#a54743',marker='x',label='Gagal')
++            if best:
++                ax.scatter(best['route_id'],best['duration_s'],marker='*',s=120,
++                           color='#dc9f23',label='Waktu sukses minimum',zorder=5)
++        render(figures/'speed_test.png','Durasi uji rute dengan model beku','ID rute','Detik simulasi',speed,'routes.json')
++    ev=summary['evaluation']
++    train=summary['training']
++    path=args.output/'analysis/drl_analysis.md'
++    path.parent.mkdir(parents=True,exist_ok=True)
++    lines=[
++        '# Analisis Eksperimen Double DQN','',
++        f"Training menyelesaikan {train['episodes']} episode, {train['steps']:,} langkah, "
++        f"dan {train['gradient_updates']:,} pembaruan gradien. "
++        f"Sebanyak {train['training_successes']} episode mencapai goal dan menghasilkan {train['routes_found']} kandidat.",
++        '',
++        f"Jaringan memiliki {config['parameters']:,} parameter. Replay menyimpan state kontinu, "
++        'reward, status terminal, truncation, serta mask aksi sensor untuk state berikutnya.',
++        '',
++        '## Evaluasi beku','',
++        f"Model final menyelesaikan {ev['successes']}/{ev['runs']} episode. "
++        f"{ev['collision_episodes']} episode memiliki tabrakan dengan {ev['collision_events']} kejadian. "
++        f"Timeout {ev['timeouts']}, pencarian habis {ev['search_exhausted']}. "
++        f"Rerata reward {ev['average_reward']:.2f}, median {ev['median_reward']:.2f}. "
++        f"Rerata langkah {ev['average_steps']:.2f}, median {ev['median_steps']:.2f}. "
++        f"Rerata durasi {ev['average_duration_s']:.2f} s dan jarak {ev['mean_distance_m']:.2f} m.",
++        '',
++        '## Uji kecepatan','',
++        (f"Rute {best['route_id']} mencatat {best['duration_s']:.2f} detik simulasi "
++         f"pada percobaan {best['trial']} dari {len(trials)} pengujian. "
++         'Rekor ini berlaku untuk rute yang diuji.' if best else
++         f'BELUM ADA HASIL waktu tercepat. Jumlah percobaan yang tercatat {len(trials)}.'),
++        '',
++        '## Interpretasi','',
++        f"Rerata reward pada lima episode pertama {statistics.mean(reward[:5]):.2f} dan "
++        f"lima episode terakhir {statistics.mean(reward[-5:]):.2f}. "
++        'Reward dipengaruhi tabrakan, progres, dan durasi. Loss mengukur kesalahan terhadap target Bellman pada replay dan bergerak bersama perubahan data dan jaringan target. Nilai Q mengestimasi reward diskonto. Bukti keberhasilan navigasi berasal dari status goal pada evaluasi.',
++        '',
++        'Kondisi awal, model, dan seed tercatat di data. Evaluasi memakai satu maze dan belum mengukur generalisasi.',
++    ]
++    out_webots=data/'webots/latest_run.json'
++    if out_webots.is_file():
++        web=read_json(out_webots)
++        if web['trajectory']:
++            def trajectory(ax):
++                x, y = zip(*web['trajectory'])
++                ax.plot(x,y,color='#247680',lw=1,label='Trajektori GPS')
++                ax.scatter(*web['start'],color='#327b50',label='Start')
++                ax.scatter(*web['goal'],color='#b96c2c',label='Goal')
++                ax.set_aspect('equal',adjustable='datalim')
++            render(figures/'webots_trajectory.png','Lintasan aktual Webots','x (m)','y (m)',
++                   trajectory,'data/webots/latest_run.json')
++        lines += ['', '## Webots terpisah','',
++                  f"Status {web['status']} pada {web['simulation_duration_s']:.3f} detik simulasi. "
++                  f"Kontak {web['collision_count']}. Hasil ini tidak digabung dengan evaluasi kinematik."]
++    path.write_text('\n'.join(lines)+'\n')
++
++
++if __name__=='__main__':
++    main()
+diff --git a/tools/evaluate_lidar_dqn.py b/tools/evaluate_lidar_dqn.py
+new file mode 100644
+index 0000000..9d63c23
+--- /dev/null
++++ b/tools/evaluate_lidar_dqn.py
+@@ -0,0 +1,144 @@
++"""Frozen Double DQN rollouts and route timing on the original Micromouse maze."""
++import argparse
++import csv
++import hashlib
++import json
++import math
++from pathlib import Path
++import statistics
++import sys
++
++import numpy as np
++import torch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / 'controllers/micromouse'))
++
++from continuous_control import NavigationMap
++from lidar_dqn_agent import load_inference
++from lidar_dqn_env import DQNMission
++from train_q_learning import read_world
++from train_lidar_q import remove_backtracking
++
++
++def maze_mission(timeout):
++    maze = read_world()
++    nav = NavigationMap(maze.start, maze.goal, maze.walls, maze.bounds, maze.cell_size, guided=False)
++    return DQNMission(nav, timeout)
++
++
++@torch.inference_mode()
++def rollout(mission, model, *, heading, seed, route=(), trace=None):
++    state, _ = mission.reset(seed=seed, options=dict(heading=heading, search_seed=seed, route=route))
++    count = 0
++    while True:
++        mask = mission.action_mask(state)
++        q = model(torch.from_numpy(state)).numpy()
++        if not np.isfinite(q).all():
++            raise FloatingPointError('Nonfinite Q during evaluation.')
++        decision = int(np.where(mask, q, -np.inf).argmax())
++        if trace is not None and mission.target is not None and not mission.motion.collision_recovery:
++            trace.append(dict(seed=seed, step=count, observation=state.tolist(),
++                              valid=mask.tolist(), q=q.tolist(), action=decision))
++            if len(trace) >= 120:
++                trace = None
++        state, _, terminal, truncated, info = mission.step(decision)
++        count += 1
++        if terminal or truncated:
++            return dict(seed=seed, heading_rad=heading, timeout=truncated, **info)
++
++
++def metrics(rows):
++    wins = [r['duration_s'] for r in rows if r['success']]
++    return dict(runs=len(rows), successes=len(wins), failures=len(rows)-len(wins),
++                success_rate=len(wins)/len(rows),
++                collision_episodes=sum(r['collision_count'] > 0 for r in rows),
++                collision_events=sum(r['collision_count'] for r in rows),
++                timeouts=sum(r['timeout'] for r in rows), search_exhausted=sum(r['search_exhausted'] for r in rows),
++                average_reward=statistics.mean(r['reward'] for r in rows),
++                median_reward=statistics.median(r['reward'] for r in rows),
++                average_steps=statistics.mean(r['steps'] for r in rows),
++                median_steps=statistics.median(r['steps'] for r in rows),
++                average_duration_s=statistics.mean(r['duration_s'] for r in rows),
++                best_success_s=min(wins, default=None),
++                mean_distance_m=statistics.mean(r['distance_m'] for r in rows))
++
++
++def write_json(path, value):
++    path.write_text(json.dumps(value, indent=2, allow_nan=False) + '\n')
++
++
++def evaluate(checkpoint, data, candidates, config):
++    model, saved = load_inference(checkpoint)
++    sha = hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest()
++    mission = maze_mission(config['timeout'])
++    samples = []
++    rows = []
++    for index in range(config['evaluation_runs']):
++        heading = ((index % 8) - 3.5) * math.pi / 4
++        r = rollout(mission, model, seed=index, heading=heading,
++                    trace=samples if index == 0 else None)
++        rows.append(r)
++        print(f"Evaluasi {index+1}: goal={r['success']} | waktu={r['duration_s']:.2f}s", flush=True)
++    write_json(data / 'evaluations.json', rows)
++    columns = [key for key in rows[0] if key not in ('route','replay')]
++    with (data / 'evaluation_results.csv').open('w', newline='') as stream:
++        writer = csv.DictWriter(stream, fieldnames=columns, extrasaction='ignore')
++        writer.writeheader()
++        writer.writerows(rows)
++    if samples:
++        with (data / 'action_values.csv').open('w', newline='') as stream:
++            writer = csv.writer(stream)
++            writer.writerow(['seed','step','observation','mask',*[f'q{i}' for i in range(6)],'action'])
++            for row in samples:
++                writer.writerow([row['seed'],row['step'],json.dumps(row['observation']),
++                                 json.dumps(row['valid']),*row['q'],row['action']])
++    if not candidates:
++        # A successful frozen exploration can discover usable routes even
++        # when exploratory training did not complete a mission.
++        found = {}
++        for row in rows:
++            route = remove_backtracking(row['route'])
++            if route and route not in found:
++                found[route] = dict(route_id=len(found)+1,targets=route,
++                                    discovered_seed=row['seed'],source='frozen_evaluation')
++        candidates = list(found.values())
++    trials = []
++    for candidate in candidates:
++        for trial in range(config['speed_trials']):
++            # Conditions match between routes. The three starts share the same
++            # position with small, explicitly recorded heading variation.
++            heading = (0., -.10, .10)[trial % 3]
++            result = rollout(mission, model, seed=trial, heading=heading, route=candidate['targets'])
++            trials.append(dict(route_id=candidate['route_id'], trial=trial+1, **result))
++        print(f"Uji rute {candidate['route_id']} selesai.", flush=True)
++    wins = [r for r in trials if r['success']]
++    best = min(wins, key=lambda r:r['duration_s'], default=None)
++    write_json(data / 'routes.json', dict(candidates=candidates, trials=trials, best=best))
++    return dict(checkpoint=str(checkpoint), sha256=sha, episode=saved['progress']['episode'],
++                epsilon=0, online_frozen=True, evaluation=metrics(rows), route_tests=len(trials),
++                route_successes=len(wins), fastest_route=best)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--checkpoint', type=Path, required=True)
++    parser.add_argument('--output', type=Path, required=True)
++    parser.add_argument('--routes', type=Path, help='Optional routes.json with recorded DFS candidates')
++    parser.add_argument('--runs', type=int)
++    args = parser.parse_args()
++    torch.set_num_threads(1)
++    _, saved = load_inference(args.checkpoint)
++    config = saved['config'].copy()
++    if args.runs is not None:
++        if args.runs < 1:
++            parser.error('--runs must be positive')
++        config['evaluation_runs'] = args.runs
++    candidates = json.loads(args.routes.read_text())['candidates'] if args.routes else saved['progress']['routes']
++    args.output.mkdir(parents=True, exist_ok=False)
++    info = evaluate(args.checkpoint, args.output, candidates, config)
++    write_json(args.output / 'summary.json', info)
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tools/export_lidar_dqn.py b/tools/export_lidar_dqn.py
+new file mode 100644
+index 0000000..1488604
+--- /dev/null
++++ b/tools/export_lidar_dqn.py
+@@ -0,0 +1,29 @@
++"""Export the trained DQN checkpoint for the NumPy-only Webots runtime."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import sys
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'controllers/micromouse'))
++from lidar_dqn import schema
++from lidar_dqn_agent import load_inference, VERSION
++
++
++def main():
++    parser=argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--checkpoint',type=Path,required=True)
++    parser.add_argument('--output',type=Path,required=True)
++    args=parser.parse_args()
++    model,saved=load_inference(args.checkpoint)
++    layers=[dict(weight=m.weight.tolist(),bias=m.bias.tolist())
++            for m in model.layers if hasattr(m,'weight')]
++    args.output.parent.mkdir(parents=True,exist_ok=True)
++    args.output.write_text(json.dumps(dict(
++        algorithm='masked_double_dqn',version=VERSION,schema=schema(),layers=layers,
++        checkpoint_sha256=hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
++        maze_signature=saved['progress']['maze_signature']),allow_nan=False)+'\n')
++
++
++if __name__=='__main__':
++    main()
+diff --git a/tools/lidar_dqn_env.py b/tools/lidar_dqn_env.py
+new file mode 100644
+index 0000000..caafd3d
+--- /dev/null
++++ b/tools/lidar_dqn_env.py
+@@ -0,0 +1,37 @@
++"""Discrete gym adapter over the shared DFS and continuous motion mission."""
++import math
++
++import gymnasium as gym
++import numpy as np
++
++from lidar_dqn import FEATURES, NUM_ACTIONS, action_mask, encode_observation, get_action_mask
++from lidar_drl_env import LidarMission
++from lidar_qlearning import STOP_ACTION
++
++
++class DQNMission(LidarMission):
++    def __init__(self, navigation, timeout):
++        super().__init__(navigation, timeout)
++        bounds = navigation.bounds
++        self.distance_scale = math.hypot(bounds[1] - bounds[0], bounds[3] - bounds[2])
++        self.action_space = gym.spaces.Discrete(NUM_ACTIONS)
++        self.observation_space = gym.spaces.Box(-1., 1., (len(FEATURES),), dtype=np.float32)
++
++    def _observation(self):
++        env = self.motion
++        return encode_observation(env.pose, self.target, env.lidar_sectors, env.wheels,
++                                  env.config, self.distance_scale, recovering=env.collision_recovery)
++
++    def action_mask(self, observation):
++        if self.motion.collision_recovery:
++            return action_mask((STOP_ACTION,))
++        if self.target is None:
++            if self.route_search.scan_bearing is None:
++                return action_mask((STOP_ACTION,))
++            return action_mask((self.route_search.scan_action(self.motion.lidar_sectors),))
++        return get_action_mask(observation) & action_mask(self.allowed_actions())
++
++    def step(self, action):
++        if not self.action_space.contains(action):
++            raise ValueError('Invalid DQN action index.')
++        return self.tabular_step(action)
+diff --git a/tools/train_lidar_dqn.py b/tools/train_lidar_dqn.py
+new file mode 100644
+index 0000000..864418c
+--- /dev/null
++++ b/tools/train_lidar_dqn.py
+@@ -0,0 +1,196 @@
++"""Train Double DQN in the original continuous Micromouse environment."""
++import argparse
++import csv
++from datetime import datetime, timezone
++import json
++import math
++from pathlib import Path
++import platform
++import random
++import subprocess
++import sys
++import time
++
++import numpy as np
++import torch
++
++from evaluate_lidar_dqn import ROOT, evaluate, maze_mission, write_json
++from lidar_dqn import schema
++from lidar_dqn_agent import DQNAgent, VERSION, atomic_save, read_checkpoint
++from train_lidar_q import remove_backtracking
++
++BASE = '5c4cf33c2e045245be1cf49340a5a5e7eb27f5fa'
++FIELDS = (
++    'episode', 'seed', 'heading_rad', 'reward', 'steps', 'duration_s', 'distance_m',
++    'success', 'collision', 'collision_count', 'timeout', 'search_exhausted',
++    'epsilon', 'td_loss', 'mean_q', 'max_q', 'replay_size', 'gradient_updates',
++    'target_updates', 'route_id', 'global_step', 'training_elapsed_s',
++)
++
++
++def epsilon_at(step, config, step_budget):
++    fraction = min(1., step / max(1., config['epsilon_decay_fraction'] * step_budget))
++    return config['epsilon_start'] + fraction * (config['epsilon_min'] - config['epsilon_start'])
++
++
++def train_episode(mission, agent, episode, global_step, step_budget):
++    config = agent.config
++    seed = episode - 1
++    heading = random.Random(config['seed'] + seed).uniform(-math.pi, math.pi)
++    state, _ = mission.reset(seed=config['seed'] + seed, options=dict(heading=heading, search_seed=seed))
++    mask = mission.action_mask(state)
++    update_stats = []
++    while True:
++        epsilon = epsilon_at(global_step, config, step_budget)
++        action = agent.choose(state, mask, epsilon)
++        next_state, reward, terminal, truncated, info = mission.step(action)
++        next_mask = mission.action_mask(next_state)
++        agent.replay.push(state, action, reward, next_state, terminal, truncated, next_mask)
++        global_step += 1
++        if global_step % config['update_every'] == 0:
++            result = agent.update()
++            if result is not None:
++                update_stats.append(result)
++        state, mask = next_state, next_mask
++        if terminal or truncated:
++            break
++    values = np.asarray(update_stats)
++    row = dict(episode=episode, heading_rad=heading, seed=seed, timeout=truncated,
++               collision=info['collision_count'] > 0, epsilon=epsilon, global_step=global_step,
++               replay_size=agent.replay.size, gradient_updates=agent.updates, target_updates=agent.target_updates,
++               td_loss=float(values[:,0].mean()) if len(values) else None,
++               mean_q=float(values[:,1].mean()) if len(values) else None,
++               max_q=float(values[:,2].max()) if len(values) else None,
++               reward=float(info['reward']),
++               **{key:info[key] for key in ('steps','duration_s','distance_m','success','collision_count','search_exhausted')})
++    return row, remove_backtracking(info['route'])
++
++
++def validate_config(config):
++    positive = ('episodes','evaluation_runs','capacity','batch_size','warmup','target_interval',
++                'update_every','checkpoint_every','speed_trials')
++    if any(type(config[key]) is not int or config[key] < 1 for key in positive):
++        raise ValueError('Training counts must be positive integers.')
++    if config['capacity'] < max(config['warmup'],config['batch_size']):
++        raise ValueError('Replay capacity must cover a warm-up and batch.')
++    if not 0 <= config['epsilon_min'] <= config['epsilon_start'] <= 1 or not 0 < config['epsilon_decay_fraction'] <= 1:
++        raise ValueError('Invalid epsilon schedule.')
++    if not 0 <= config['gamma'] <= 1 or any(not math.isfinite(config[k]) or config[k]<=0 for k in
++                                            ('timeout','learning_rate','gradient_clip')):
++        raise ValueError('Invalid optimization or timeout configuration.')
++    if config['device'] != 'cpu' and not torch.cuda.is_available():
++        raise ValueError('CUDA unavailable. Use device cpu.')
++
++
++def run(config, output, *, resume=None, stop_after=None):
++    validate_config(config)
++    torch.set_num_threads(1)
++    torch.use_deterministic_algorithms(True)
++    data, models = output/'data', output/'models'
++    if resume is None and any(folder.exists() for folder in (data, models)):
++        raise ValueError('Use a fresh output directory or an explicit --resume checkpoint.')
++    for folder in (data, models):
++        folder.mkdir(parents=True, exist_ok=True)
++    mission = maze_mission(config['timeout'])
++    step_budget = config['episodes'] * mission.motion.max_steps
++    agent = DQNAgent(config)
++    manifest = dict(
++        version=VERSION, algorithm='masked_double_dqn', architecture_base=BASE,
++        head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
++        generated_at_utc=datetime.now(timezone.utc).isoformat(),
++        python=sys.version, pytorch=str(torch.__version__), cuda_available=torch.cuda.is_available(),
++        device=config['device'], machine=platform.machine(), cpu=platform.processor(),
++        config=config, **schema(), parameters=sum(p.numel() for p in agent.online.parameters()),
++        maze=dict(signature=mission.motion.nav.signature, start=mission.motion.base_start.tolist(),
++                  goal=mission.motion.base_goal.tolist(), bounds=list(mission.motion.nav.bounds),
++                  cell_size=mission.motion.nav.cell_size, distance_scale=mission.distance_scale,
++                  step_s=mission.motion.decision_seconds, max_steps=mission.motion.max_steps),
++        nominal_step_budget=step_budget, reward_source='LidarQEnvironment.step',
++        eval_protocol='epsilon zero, seed i, heading ((i % 8) - 3.5) * pi/4',
++        route_protocol='freeze final model; replay discovered candidates with headings 0, -0.10, +0.10 radians',
++        scoring_best_checkpoint='successful training episode, then fewest contacts, then shortest duration; final checkpoint is evaluated')
++    progress = dict(episode=0, global_step=0, epsilon=config['epsilon_start'], routes=[],
++                    history=[], best_score=None, elapsed_s=0.)
++    if resume is not None:
++        progress = agent.resume(resume)
++        if progress.get('maze_signature') != manifest['maze']['signature']:
++            raise ValueError('Resume checkpoint uses a different maze.')
++        # Fresh-output resume keeps the earlier best checkpoint from the parent run.
++        prior_best = resume.parent/'best_model.pt'
++        if prior_best.is_file() and (models/'best_model.pt').resolve() != prior_best.resolve():
++            atomic_save(read_checkpoint(prior_best),models/'best_model.pt')
++    progress['maze_signature'] = manifest['maze']['signature']
++    if not (data/'run.json').exists():
++        write_json(data/'run.json',manifest)
++    clock = time.perf_counter()
++    prior_elapsed = progress['elapsed_s']
++    end = config['episodes'] if stop_after is None else min(stop_after, config['episodes'])
++    with (data/'training.csv').open('w',newline='') as stream:
++        writer = csv.DictWriter(stream,fieldnames=FIELDS)
++        writer.writeheader()
++        writer.writerows(progress['history'])
++        for episode in range(progress['episode']+1,end+1):
++            row, route = train_episode(mission, agent, episode, progress['global_step'], step_budget)
++            route_id = None
++            if route:
++                targets = [[float(value) for value in point] for point in route]
++                found = next((r for r in progress['routes'] if r['targets']==targets),None)
++                if found is None:
++                    found = dict(route_id=len(progress['routes'])+1, targets=targets, discovered_episode=episode,
++                                 exploration_duration_s=row['duration_s'])
++                    progress['routes'].append(found)
++                route_id = found['route_id']
++            row['route_id'] = route_id
++            row['training_elapsed_s'] = prior_elapsed+time.perf_counter()-clock
++            progress.update(episode=episode,global_step=row['global_step'],epsilon=row['epsilon'],
++                            elapsed_s=row['training_elapsed_s'])
++            progress['history'].append(row)
++            writer.writerow(row); stream.flush()
++            score = [int(not row['success']),row['collision_count'],
++                     row['duration_s'] if row['success'] else -row['reward']]
++            if progress['best_score'] is None or score < progress['best_score']:
++                progress['best_score'] = score
++                agent.save(models/'best_model.pt',progress)
++            # A resume checkpoint is written at episode boundaries. This includes
++            # the full replay buffer, RNG, and history, so continuation is exact.
++            agent.save(models/'checkpoint_latest.pt',progress,full=True)
++            if episode % config['checkpoint_every']==0 or episode==end:
++                agent.save(models/'last_model.pt',progress)
++            print(f"Episode {episode}/{config['episodes']} | goal={row['success']} | "
++                  f"tabrakan={row['collision_count']} | langkah={row['global_step']} | "
++                  f"epsilon={row['epsilon']:.3f} | update={agent.updates}",flush=True)
++    if progress['episode'] == 0:
++        raise ValueError('No episode boundary to save.')
++    agent.save(models/'last_model.pt',progress)
++    atomic_save(dict(version=VERSION,schema=schema(),target=agent.target.state_dict(),
++                     updates=agent.updates,target_updates=agent.target_updates),models/'target_network.pt')
++    stats = dict(episodes=progress['episode'],steps=progress['global_step'],routes_found=len(progress['routes']),
++                 training_successes=sum(r['success'] for r in progress['history']),
++                 training_seconds=progress['elapsed_s'], gradient_updates=agent.updates,target_updates=agent.target_updates)
++    report = dict(training=stats)
++    if progress['episode']==config['episodes']:
++        report.update(evaluate(models/'last_model.pt',data,progress['routes'],config))
++    write_json(data/'summary.json',report)
++    return report
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--config',type=Path,default=ROOT/'configs/lidar_dqn.json')
++    parser.add_argument('--output',type=Path,default=ROOT/'output/drl')
++    parser.add_argument('--resume',type=Path)
++    parser.add_argument('--stop-after-episodes',type=int)
++    for name,kind in (('episodes',int),('timeout',float),('evaluation-runs',int),('warmup',int),
++                      ('seed',int),('update-every',int),('speed-trials',int)):
++        parser.add_argument('--'+name,type=kind)
++    args=parser.parse_args()
++    config=json.loads(args.config.read_text())
++    for key in config:
++        value=getattr(args,key,None)
++        if value is not None:
++            config[key]=value
++    print(json.dumps(run(config,args.output,resume=args.resume,stop_after=args.stop_after_episodes),indent=2))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/test_lidar_dqn.py b/tests/test_lidar_dqn.py
+new file mode 100644
+index 0000000..771781c
+--- /dev/null
++++ b/tests/test_lidar_dqn.py
+@@ -0,0 +1,143 @@
++"""Regression checks for the masked Double DQN and real maze adapter."""
++import math
++from pathlib import Path
++import sys
++import tempfile
++import unittest
++
++import numpy as np
++import torch
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path[:0] = [str(ROOT/'controllers/micromouse'),str(ROOT/'tools')]
++
++from continuous_control import ControlConfig
++from evaluate_lidar_dqn import maze_mission, rollout
++from lidar_dqn import FEATURES, encode_observation, get_action_mask
++from lidar_dqn_agent import DQNAgent, double_dqn_target, load_inference
++from lidar_dqn_network import QNetwork
++from lidar_dqn_replay import ReplayBuffer
++
++
++def config():
++    return dict(device='cpu', seed=42, hidden=[128,128], learning_rate=.001,
++                capacity=8, warmup=2, batch_size=2, gamma=.98, gradient_clip=10.,
++                target_interval=2)
++
++
++class DQNTests(unittest.TestCase):
++    def setUp(self):
++        torch.set_num_threads(1)
++        self.state=np.zeros(len(FEATURES),np.float32)
++        self.mask=np.array([False,True,False,True,False,False])
++
++    def test_encoder_and_velocity(self):
++        cfg=ControlConfig()
++        obs=encode_observation([0,0,0],[-1,0],[.16,4,2,3,4],
++                               [-cfg.wheel_limit,cfg.wheel_limit],cfg,4)
++        self.assertEqual(obs.dtype,np.float32)
++        self.assertEqual(obs.shape,(12,))
++        np.testing.assert_allclose(obs[:3],[0,-1,.25],atol=1e-6)
++        np.testing.assert_allclose(obs[8:],[0,1,0,0])
++        self.assertTrue(np.isfinite(obs).all())
++        with self.assertRaises(ValueError):
++            encode_observation([0,0,0],None,[np.nan]*5,[0,0],cfg,4)
++
++    def test_lidar_mask_fallback(self):
++        state=self.state.copy()
++        self.assertEqual(np.flatnonzero(get_action_mask(state)).tolist(),[5])
++        state[3:8]=np.array([.2,.1,1,1,.4])/4
++        self.assertEqual(np.flatnonzero(get_action_mask(state)).tolist(),[0,2,3,4])
++        state[-1]=1
++        self.assertEqual(np.flatnonzero(get_action_mask(state)).tolist(),[5])
++
++    def test_forward_and_backward(self):
++        network=QNetwork()
++        x=network(torch.ones(3,len(FEATURES)))
++        self.assertEqual(x.shape,(3,6))
++        self.assertEqual(sum(p.numel() for p in network.parameters()),18950)
++        self.assertTrue(torch.isfinite(x).all())
++        x.square().mean().backward()
++        self.assertTrue(all(torch.isfinite(p.grad).all() for p in network.parameters()))
++
++    def test_mask_applies_to_greedy_and_epsilon(self):
++        agent=DQNAgent(config())
++        agent.values=lambda _: np.array([99,1,45,3,4,8])
++        self.assertEqual(agent.choose(self.state,self.mask,0),3)
++        self.assertEqual({agent.choose(self.state,self.mask,1) for _ in range(80)},{1,3})
++
++    def test_double_target_uses_online_choice_and_terminal_bit(self):
++        online=torch.tensor([[100.,3.,0.,2.,0.,0.]]).expand(2,-1)
++        target=torch.tensor([[90.,5.,0.,70.,0.,0.]]).expand(2,-1)
++        masked=double_dqn_target(online,target,torch.from_numpy(np.tile(self.mask,(2,1))),
++                                torch.ones(2),torch.tensor([False,True]),.98)
++        torch.testing.assert_close(masked,torch.tensor([5.9,1.]))
++
++    def test_replay_wrap_and_sample(self):
++        replay=ReplayBuffer(3)
++        for step in range(5):
++            replay.push(self.state,1,step,self.state,False,step==4,self.mask)
++        self.assertEqual(replay.size,3)
++        batch=replay.sample(3,np.random.default_rng(10),'cpu')
++        self.assertEqual(set(batch['reward'].tolist()),{2,3,4})
++        self.assertEqual(batch['state'].dtype,torch.float32)
++        self.assertEqual(batch['action'].dtype,torch.int64)
++        self.assertEqual(batch['truncated'].sum().item(),1)
++        copy=ReplayBuffer(3)
++        copy.load_state_dict(replay.state_dict())
++        self.assertEqual(copy.cursor,replay.cursor)
++
++    def test_optimizer_target_sync_save_load_resume(self):
++        agent=DQNAgent(config())
++        self.assertIsNone(agent.update())
++        for _ in range(4):
++            agent.replay.push(self.state,1,2,self.state,False,False,self.mask)
++        initial=agent.target.layers[-1].bias.clone()
++        self.assertTrue(math.isfinite(agent.update()[0]))
++        self.assertFalse(torch.equal(agent.online.layers[-1].bias,initial))
++        self.assertTrue(torch.equal(agent.target.layers[-1].bias,initial))
++        agent.update()
++        self.assertEqual(agent.target_updates,1)
++        self.assertTrue(torch.equal(agent.online.layers[-1].bias,agent.target.layers[-1].bias))
++        self.assertTrue(all(p.grad is None for p in agent.target.parameters()))
++        with tempfile.TemporaryDirectory() as directory:
++            checkpoint=Path(directory)/'checkpoint.pt'
++            agent.save(checkpoint,dict(episode=1,global_step=4),full=True)
++            actor,_=load_inference(checkpoint)
++            np.testing.assert_array_equal(actor(torch.from_numpy(self.state)).numpy(),agent.values(self.state))
++            restored=DQNAgent(config())
++            self.assertEqual(restored.resume(checkpoint)['episode'],1)
++            self.assertEqual(restored.replay.size,4)
++            np.testing.assert_array_equal(agent.update(),restored.update())
++            np.testing.assert_array_equal(agent.values(self.state),restored.values(self.state))
++
++    def test_real_maze_timeout_and_deterministic_evaluation(self):
++        mission=maze_mission(.64)
++        agent=DQNAgent(config())
++        before=agent.online.layers[-1].bias.detach().clone()
++        result=rollout(mission,agent.online,heading=0,seed=4)
++        self.assertEqual(result,rollout(mission,agent.online,heading=0,seed=4))
++        self.assertTrue(result['timeout'])
++        self.assertEqual(result['steps'],4)
++        self.assertTrue(torch.equal(before,agent.online.layers[-1].bias))
++        self.assertEqual(agent.updates,0)
++
++    def test_original_collision_and_recovery(self):
++        motion=maze_mission(300).motion
++        motion.reset(heading=math.pi)
++        for _ in range(15):
++            state,reward,terminal,truncated,info=motion.step(0)
++            if info['collision']:
++                break
++        self.assertTrue(info['collision'])
++        self.assertFalse(terminal or truncated)
++        self.assertEqual(info['reward_parts']['collision'],-100.)
++        step=motion.steps
++        while motion.collision_recovery:
++            _,_,terminated,truncated,info=motion.step(5)
++            self.assertFalse(terminated or truncated or info['collision'])
++        self.assertEqual(motion.steps-step,5)
++
++
++if __name__=='__main__':
++    unittest.main()

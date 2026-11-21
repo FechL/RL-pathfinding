@@ -1,0 +1,3298 @@
+{
+  "run_id": "q_learning-5339bee874b3",
+  "algorithm": "q_learning",
+  "step_seconds": 0.16,
+  "bounds": [
+    -3.2,
+    3.2,
+    -3.2,
+    3.2
+  ],
+  "start": [
+    -3.0,
+    -3.0
+  ],
+  "goal": [
+    2.8,
+    2.8
+  ],
+  "cell_size": 0.4,
+  "feature_names": [],
+  "walls": [
+    {
+      "center": [
+        -3.0,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -3.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        -3.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -3.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.6,
+        -2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -3.0,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.4,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.2,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.6,
+        -2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.4,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        3.0,
+        -2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.4,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        -1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        -1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.8,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        -1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.8,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        -0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        -1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -3.0,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.4,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        -0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        -0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.8,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.2,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        0.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        -0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.8,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        0.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.6,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        3.0,
+        0.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        0.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        0.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.8,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.2,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.2,
+        1.2
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        1.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -3.0,
+        1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.2,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.8,
+        1.4
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.6,
+        1.6
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.4,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.2,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.4,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        1.8
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        2.2,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        3.0,
+        2.0
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -3.0,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.2,
+        2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.4,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.2,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.8,
+        2.4
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        2.2
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.6,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -2.2,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -1.6,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.8,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        -0.8,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.4,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -0.6,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.2,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.6,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        1.6,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        1.4,
+        2.8
+      ],
+      "size": [
+        0.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        2.4,
+        2.6
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -1.2,
+        3.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        0.8,
+        3.0
+      ],
+      "size": [
+        0.05,
+        0.45
+      ]
+    },
+    {
+      "center": [
+        -3.225,
+        0.0
+      ],
+      "size": [
+        0.05,
+        6.45
+      ]
+    },
+    {
+      "center": [
+        3.225,
+        0.0
+      ],
+      "size": [
+        0.05,
+        6.45
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        -3.225
+      ],
+      "size": [
+        6.45,
+        0.05
+      ]
+    },
+    {
+      "center": [
+        0.0,
+        3.225
+      ],
+      "size": [
+        6.45,
+        0.05
+      ]
+    }
+  ],
+  "started_at": "2026-11-21T13:23:15.784+00:00",
+  "status": "encoded",
+  "webots": {
+    "status": "encoded",
+    "result": "success",
+    "simulation_time_s": 228.576,
+    "source_sha256": "28f202672f74d990ebbbf16ae28244de6103e2f3c744602dec9b67eb843cb372",
+    "source": "webots_source.json",
+    "stride": 64,
+    "filename": "webots_evaluation.mp4",
+    "step_rows": 14286,
+    "first_step": 1,
+    "last_step": 14286,
+    "frame_mapping": "webots_frame_mapping.csv",
+    "telemetry": "webots_step_telemetry.jsonl",
+    "notes": "Sensor spokes are the measured sector minima. Reward unavailable in Webots inference. Q-only older telemetry has no mask or wheel readings; velocity is estimated from GPS/IMU differences. The final frame uses the recorded terminal position and has no fabricated IMU/LiDAR sample.",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 600,
+    "avg_frame_rate": "24/1",
+    "duration": "9.375000",
+    "nb_frames": "225"
+  },
+  "synchronization": "global_row is the stable key for per-video frame index CSV files",
+  "raw_pose_timing": "robot and lidar are pre-action; post pose, reward and events are after action",
+  "step_rows": 57424,
+  "finished_at": "2026-11-21T13:27:16.329+00:00",
+  "capture_status": "captured",
+  "fps": 24,
+  "width": 960,
+  "height": 600,
+  "codec": "libx264",
+  "frame_sampling": {
+    "training_stride": 24,
+    "overview_stride": 144,
+    "retained": "first, last, collision and goal in full/evaluation; first and last in overview"
+  },
+  "frame_mapping": "frame_mapping.csv",
+  "recorded_episodes": 48,
+  "omitted_episodes": [],
+  "best_attempt": {
+    "filename": "best_successful_run.mp4",
+    "selection": "minimum successful time",
+    "run_id": "q_learning-5339bee874b3",
+    "algorithm": "q_learning",
+    "episode": "20",
+    "phase": "speed_test",
+    "recording_phase": "training",
+    "episode_key": "training-000020",
+    "total_steps": "710",
+    "total_reward": "197.6009397902672",
+    "average_reward_per_step": "0.2783111828031932",
+    "duration_simulation_s": "113.60000000000001",
+    "duration_wall_clock_s": "2.913276302999293",
+    "success": "True",
+    "collision": "True",
+    "collision_count": "1",
+    "timeout": "False",
+    "search_exhausted": "False",
+    "epsilon_start": "0.07406997698298323",
+    "epsilon_end": "0.07406997698298323",
+    "unique_states_visited": "142",
+    "replay_buffer_size": "",
+    "gradient_updates": "",
+    "best_reward_so_far": "362.1992059590718",
+    "best_successful_time_so_far": "113.60000000000001",
+    "distance_to_goal_m": "0.07160814106603634",
+    "first_row": "27416",
+    "last_row": "28125",
+    "frame_stride": 1
+  },
+  "videos": [
+    {
+      "filename": "episodes/episode_000001.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000001"
+      ],
+      "first_global_row": 1,
+      "last_global_row": 1875,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "9.250000",
+      "nb_frames": "222"
+    },
+    {
+      "filename": "episodes/episode_000002.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000002"
+      ],
+      "first_global_row": 1876,
+      "last_global_row": 3750,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "8.166667",
+      "nb_frames": "196"
+    },
+    {
+      "filename": "episodes/episode_000003.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000003"
+      ],
+      "first_global_row": 3751,
+      "last_global_row": 4833,
+      "first_step": 1,
+      "last_step": 1083,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.041667",
+      "nb_frames": "49"
+    },
+    {
+      "filename": "episodes/episode_000004.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000004"
+      ],
+      "first_global_row": 4834,
+      "last_global_row": 6423,
+      "first_step": 1,
+      "last_step": 1590,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.916667",
+      "nb_frames": "70"
+    },
+    {
+      "filename": "episodes/episode_000005.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000005"
+      ],
+      "first_global_row": 6424,
+      "last_global_row": 8298,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "7.208333",
+      "nb_frames": "173"
+    },
+    {
+      "filename": "episodes/episode_000006.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000006"
+      ],
+      "first_global_row": 8299,
+      "last_global_row": 10173,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "10.000000",
+      "nb_frames": "240"
+    },
+    {
+      "filename": "episodes/episode_000007.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000007"
+      ],
+      "first_global_row": 10174,
+      "last_global_row": 11829,
+      "first_step": 1,
+      "last_step": 1656,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.041667",
+      "nb_frames": "73"
+    },
+    {
+      "filename": "episodes/episode_000008.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000008"
+      ],
+      "first_global_row": 11830,
+      "last_global_row": 12873,
+      "first_step": 1,
+      "last_step": 1044,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.000000",
+      "nb_frames": "48"
+    },
+    {
+      "filename": "episodes/episode_000009.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000009"
+      ],
+      "first_global_row": 12874,
+      "last_global_row": 14748,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.416667",
+      "nb_frames": "82"
+    },
+    {
+      "filename": "episodes/episode_000010.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000010"
+      ],
+      "first_global_row": 14749,
+      "last_global_row": 16623,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.583333",
+      "nb_frames": "86"
+    },
+    {
+      "filename": "episodes/episode_000011.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000011"
+      ],
+      "first_global_row": 16624,
+      "last_global_row": 17739,
+      "first_step": 1,
+      "last_step": 1116,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.041667",
+      "nb_frames": "49"
+    },
+    {
+      "filename": "episodes/episode_000012.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000012"
+      ],
+      "first_global_row": 17740,
+      "last_global_row": 18797,
+      "first_step": 1,
+      "last_step": 1058,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.000000",
+      "nb_frames": "48"
+    },
+    {
+      "filename": "episodes/episode_000013.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000013"
+      ],
+      "first_global_row": 18798,
+      "last_global_row": 20030,
+      "first_step": 1,
+      "last_step": 1233,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.291667",
+      "nb_frames": "55"
+    },
+    {
+      "filename": "episodes/episode_000014.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000014"
+      ],
+      "first_global_row": 20031,
+      "last_global_row": 21514,
+      "first_step": 1,
+      "last_step": 1484,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.666667",
+      "nb_frames": "64"
+    },
+    {
+      "filename": "episodes/episode_000015.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000015"
+      ],
+      "first_global_row": 21515,
+      "last_global_row": 22486,
+      "first_step": 1,
+      "last_step": 972,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.750000",
+      "nb_frames": "42"
+    },
+    {
+      "filename": "episodes/episode_000016.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000016"
+      ],
+      "first_global_row": 22487,
+      "last_global_row": 24361,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.333333",
+      "nb_frames": "80"
+    },
+    {
+      "filename": "episodes/episode_000017.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000017"
+      ],
+      "first_global_row": 24362,
+      "last_global_row": 25249,
+      "first_step": 1,
+      "last_step": 888,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.583333",
+      "nb_frames": "38"
+    },
+    {
+      "filename": "episodes/episode_000018.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000018"
+      ],
+      "first_global_row": 25250,
+      "last_global_row": 26628,
+      "first_step": 1,
+      "last_step": 1379,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.458333",
+      "nb_frames": "59"
+    },
+    {
+      "filename": "episodes/episode_000019.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000019"
+      ],
+      "first_global_row": 26629,
+      "last_global_row": 27415,
+      "first_step": 1,
+      "last_step": 787,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.416667",
+      "nb_frames": "34"
+    },
+    {
+      "filename": "episodes/episode_000020.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000020"
+      ],
+      "first_global_row": 27416,
+      "last_global_row": 28125,
+      "first_step": 1,
+      "last_step": 710,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.333333",
+      "nb_frames": "32"
+    },
+    {
+      "filename": "episodes/episode_000021.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000021"
+      ],
+      "first_global_row": 28126,
+      "last_global_row": 29215,
+      "first_step": 1,
+      "last_step": 1090,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.958333",
+      "nb_frames": "47"
+    },
+    {
+      "filename": "episodes/episode_000022.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000022"
+      ],
+      "first_global_row": 29216,
+      "last_global_row": 30207,
+      "first_step": 1,
+      "last_step": 992,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.791667",
+      "nb_frames": "43"
+    },
+    {
+      "filename": "episodes/episode_000023.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000023"
+      ],
+      "first_global_row": 30208,
+      "last_global_row": 31160,
+      "first_step": 1,
+      "last_step": 953,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.708333",
+      "nb_frames": "41"
+    },
+    {
+      "filename": "episodes/episode_000024.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000024"
+      ],
+      "first_global_row": 31161,
+      "last_global_row": 31919,
+      "first_step": 1,
+      "last_step": 759,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/episode_000025.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000025"
+      ],
+      "first_global_row": 31920,
+      "last_global_row": 32665,
+      "first_step": 1,
+      "last_step": 746,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/episode_000026.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000026"
+      ],
+      "first_global_row": 32666,
+      "last_global_row": 33860,
+      "first_step": 1,
+      "last_step": 1195,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.125000",
+      "nb_frames": "51"
+    },
+    {
+      "filename": "episodes/episode_000027.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000027"
+      ],
+      "first_global_row": 33861,
+      "last_global_row": 34871,
+      "first_step": 1,
+      "last_step": 1011,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.833333",
+      "nb_frames": "44"
+    },
+    {
+      "filename": "episodes/episode_000028.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000028"
+      ],
+      "first_global_row": 34872,
+      "last_global_row": 35809,
+      "first_step": 1,
+      "last_step": 938,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.708333",
+      "nb_frames": "41"
+    },
+    {
+      "filename": "episodes/episode_000029.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000029"
+      ],
+      "first_global_row": 35810,
+      "last_global_row": 36569,
+      "first_step": 1,
+      "last_step": 760,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/episode_000030.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000030"
+      ],
+      "first_global_row": 36570,
+      "last_global_row": 37324,
+      "first_step": 1,
+      "last_step": 755,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/episode_000031.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000031"
+      ],
+      "first_global_row": 37325,
+      "last_global_row": 38318,
+      "first_step": 1,
+      "last_step": 994,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.791667",
+      "nb_frames": "43"
+    },
+    {
+      "filename": "episodes/episode_000032.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000032"
+      ],
+      "first_global_row": 38319,
+      "last_global_row": 39267,
+      "first_step": 1,
+      "last_step": 949,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.708333",
+      "nb_frames": "41"
+    },
+    {
+      "filename": "episodes/episode_000033.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000033"
+      ],
+      "first_global_row": 39268,
+      "last_global_row": 40229,
+      "first_step": 1,
+      "last_step": 962,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.750000",
+      "nb_frames": "42"
+    },
+    {
+      "filename": "episodes/episode_000034.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000034"
+      ],
+      "first_global_row": 40230,
+      "last_global_row": 41035,
+      "first_step": 1,
+      "last_step": 806,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.500000",
+      "nb_frames": "36"
+    },
+    {
+      "filename": "episodes/episode_000035.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000035"
+      ],
+      "first_global_row": 41036,
+      "last_global_row": 41764,
+      "first_step": 1,
+      "last_step": 729,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/episode_000036.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000036"
+      ],
+      "first_global_row": 41765,
+      "last_global_row": 42710,
+      "first_step": 1,
+      "last_step": 946,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.708333",
+      "nb_frames": "41"
+    },
+    {
+      "filename": "episodes/evaluation_000001.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000001"
+      ],
+      "first_global_row": 42711,
+      "last_global_row": 44241,
+      "first_step": 1,
+      "last_step": 1531,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.708333",
+      "nb_frames": "65"
+    },
+    {
+      "filename": "episodes/evaluation_000002.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000002"
+      ],
+      "first_global_row": 44242,
+      "last_global_row": 45010,
+      "first_step": 1,
+      "last_step": 769,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.416667",
+      "nb_frames": "34"
+    },
+    {
+      "filename": "episodes/evaluation_000003.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000003"
+      ],
+      "first_global_row": 45011,
+      "last_global_row": 45757,
+      "first_step": 1,
+      "last_step": 747,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.375000",
+      "nb_frames": "33"
+    },
+    {
+      "filename": "episodes/evaluation_000004.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000004"
+      ],
+      "first_global_row": 45758,
+      "last_global_row": 46941,
+      "first_step": 1,
+      "last_step": 1184,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.125000",
+      "nb_frames": "51"
+    },
+    {
+      "filename": "episodes/evaluation_000005.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000005"
+      ],
+      "first_global_row": 46942,
+      "last_global_row": 47720,
+      "first_step": 1,
+      "last_step": 779,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.416667",
+      "nb_frames": "34"
+    },
+    {
+      "filename": "episodes/evaluation_000006.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000006"
+      ],
+      "first_global_row": 47721,
+      "last_global_row": 48498,
+      "first_step": 1,
+      "last_step": 778,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.458333",
+      "nb_frames": "35"
+    },
+    {
+      "filename": "episodes/evaluation_000007.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000007"
+      ],
+      "first_global_row": 48499,
+      "last_global_row": 49685,
+      "first_step": 1,
+      "last_step": 1187,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.125000",
+      "nb_frames": "51"
+    },
+    {
+      "filename": "episodes/evaluation_000008.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000008"
+      ],
+      "first_global_row": 49686,
+      "last_global_row": 51560,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.458333",
+      "nb_frames": "83"
+    },
+    {
+      "filename": "episodes/evaluation_000009.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000009"
+      ],
+      "first_global_row": 51561,
+      "last_global_row": 52826,
+      "first_step": 1,
+      "last_step": 1266,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "2.250000",
+      "nb_frames": "54"
+    },
+    {
+      "filename": "episodes/evaluation_000010.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000010"
+      ],
+      "first_global_row": 52827,
+      "last_global_row": 53674,
+      "first_step": 1,
+      "last_step": 848,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "1.625000",
+      "nb_frames": "39"
+    },
+    {
+      "filename": "episodes/evaluation_000011.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000011"
+      ],
+      "first_global_row": 53675,
+      "last_global_row": 55549,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.625000",
+      "nb_frames": "87"
+    },
+    {
+      "filename": "episodes/evaluation_000012.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000012"
+      ],
+      "first_global_row": 55550,
+      "last_global_row": 57424,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "3.416667",
+      "nb_frames": "82"
+    },
+    {
+      "filename": "training_overview.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000001",
+        "training-000002",
+        "training-000003",
+        "training-000004",
+        "training-000005",
+        "training-000006",
+        "training-000007",
+        "training-000008",
+        "training-000009",
+        "training-000010",
+        "training-000011",
+        "training-000012",
+        "training-000013",
+        "training-000014",
+        "training-000015",
+        "training-000016",
+        "training-000017",
+        "training-000018",
+        "training-000019",
+        "training-000020",
+        "training-000021",
+        "training-000022",
+        "training-000023",
+        "training-000024",
+        "training-000025",
+        "training-000026",
+        "training-000027",
+        "training-000028",
+        "training-000029",
+        "training-000030",
+        "training-000031",
+        "training-000032",
+        "training-000033",
+        "training-000034",
+        "training-000035",
+        "training-000036"
+      ],
+      "first_global_row": 1,
+      "last_global_row": 42710,
+      "first_step": 1,
+      "last_step": 946,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "14.791667",
+      "nb_frames": "355"
+    },
+    {
+      "filename": "training_full.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000001",
+        "training-000002",
+        "training-000003",
+        "training-000004",
+        "training-000005",
+        "training-000006",
+        "training-000007",
+        "training-000008",
+        "training-000009",
+        "training-000010",
+        "training-000011",
+        "training-000012",
+        "training-000013",
+        "training-000014",
+        "training-000015",
+        "training-000016",
+        "training-000017",
+        "training-000018",
+        "training-000019",
+        "training-000020",
+        "training-000021",
+        "training-000022",
+        "training-000023",
+        "training-000024",
+        "training-000025",
+        "training-000026",
+        "training-000027",
+        "training-000028",
+        "training-000029",
+        "training-000030",
+        "training-000031",
+        "training-000032",
+        "training-000033",
+        "training-000034",
+        "training-000035",
+        "training-000036"
+      ],
+      "first_global_row": 1,
+      "last_global_row": 42710,
+      "first_step": 1,
+      "last_step": 946,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "98.958333",
+      "nb_frames": "2375"
+    },
+    {
+      "filename": "final_evaluation.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "evaluation-000001",
+        "evaluation-000002",
+        "evaluation-000003",
+        "evaluation-000004",
+        "evaluation-000005",
+        "evaluation-000006",
+        "evaluation-000007",
+        "evaluation-000008",
+        "evaluation-000009",
+        "evaluation-000010",
+        "evaluation-000011",
+        "evaluation-000012"
+      ],
+      "first_global_row": 42711,
+      "last_global_row": 57424,
+      "first_step": 1,
+      "last_step": 1875,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "27.000000",
+      "nb_frames": "648"
+    },
+    {
+      "filename": "best_successful_run.mp4",
+      "algorithm": "q_learning",
+      "episode_keys": [
+        "training-000020"
+      ],
+      "first_global_row": 27416,
+      "last_global_row": 28125,
+      "first_step": 1,
+      "last_step": 710,
+      "status": "encoded",
+      "codec_name": "h264",
+      "width": 960,
+      "height": 600,
+      "avg_frame_rate": "24/1",
+      "duration": "29.583333",
+      "nb_frames": "710",
+      "frame_stride": 1
+    }
+  ],
+  "phase_coverage": {
+    "training": {
+      "step_rows": 42710,
+      "video_frames": 2375,
+      "steps_without_video_frame": 40335
+    },
+    "evaluation": {
+      "step_rows": 14714,
+      "video_frames": 648,
+      "steps_without_video_frame": 14066
+    }
+  },
+  "ray_storage": "16 sampled rays from the 128 measured beams per step; five policy sector minima retained.",
+  "wall_clock_timestamp_timezone": "UTC"
+}

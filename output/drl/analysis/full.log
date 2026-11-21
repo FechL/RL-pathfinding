@@ -1,0 +1,444 @@
+Episode 1/36 | goal=False | tabrakan=38 | langkah=1875 | epsilon=0.956 | update=876
+Episode 2/36 | goal=False | tabrakan=76 | langkah=3750 | epsilon=0.912 | update=2751
+Episode 3/36 | goal=False | tabrakan=48 | langkah=5625 | epsilon=0.868 | update=4626
+Episode 4/36 | goal=False | tabrakan=5 | langkah=7500 | epsilon=0.824 | update=6501
+Episode 5/36 | goal=False | tabrakan=20 | langkah=9375 | epsilon=0.780 | update=8376
+Episode 6/36 | goal=False | tabrakan=149 | langkah=11250 | epsilon=0.736 | update=10251
+Episode 7/36 | goal=False | tabrakan=121 | langkah=13125 | epsilon=0.692 | update=12126
+Episode 8/36 | goal=False | tabrakan=150 | langkah=15000 | epsilon=0.648 | update=14001
+Episode 9/36 | goal=False | tabrakan=3 | langkah=16875 | epsilon=0.604 | update=15876
+Episode 10/36 | goal=False | tabrakan=48 | langkah=18750 | epsilon=0.560 | update=17751
+Episode 11/36 | goal=True | tabrakan=2 | langkah=20011 | epsilon=0.531 | update=19012
+Episode 12/36 | goal=True | tabrakan=5 | langkah=21057 | epsilon=0.506 | update=20058
+Episode 13/36 | goal=True | tabrakan=3 | langkah=22033 | epsilon=0.483 | update=21034
+Episode 14/36 | goal=True | tabrakan=3 | langkah=23090 | epsilon=0.458 | update=22091
+Episode 15/36 | goal=False | tabrakan=149 | langkah=24965 | epsilon=0.414 | update=23966
+Episode 16/36 | goal=False | tabrakan=0 | langkah=26840 | epsilon=0.370 | update=25841
+Episode 17/36 | goal=True | tabrakan=1 | langkah=28337 | epsilon=0.335 | update=27338
+Episode 18/36 | goal=True | tabrakan=0 | langkah=29286 | epsilon=0.313 | update=28287
+Episode 19/36 | goal=True | tabrakan=0 | langkah=30158 | epsilon=0.293 | update=29159
+Episode 20/36 | goal=True | tabrakan=1 | langkah=31215 | epsilon=0.268 | update=30216
+Episode 21/36 | goal=False | tabrakan=119 | langkah=33090 | epsilon=0.224 | update=32091
+Episode 22/36 | goal=True | tabrakan=0 | langkah=34467 | epsilon=0.192 | update=33468
+Episode 23/36 | goal=False | tabrakan=2 | langkah=36342 | epsilon=0.148 | update=35343
+Episode 24/36 | goal=True | tabrakan=1 | langkah=37071 | epsilon=0.130 | update=36072
+Episode 25/36 | goal=False | tabrakan=8 | langkah=38946 | epsilon=0.086 | update=37947
+Episode 26/36 | goal=False | tabrakan=154 | langkah=40821 | epsilon=0.050 | update=39822
+Episode 27/36 | goal=True | tabrakan=1 | langkah=42022 | epsilon=0.050 | update=41023
+Episode 28/36 | goal=False | tabrakan=24 | langkah=43897 | epsilon=0.050 | update=42898
+Episode 29/36 | goal=True | tabrakan=0 | langkah=44723 | epsilon=0.050 | update=43724
+Episode 30/36 | goal=False | tabrakan=3 | langkah=46598 | epsilon=0.050 | update=45599
+Episode 31/36 | goal=True | tabrakan=0 | langkah=47417 | epsilon=0.050 | update=46418
+Episode 32/36 | goal=True | tabrakan=1 | langkah=48356 | epsilon=0.050 | update=47357
+Episode 33/36 | goal=True | tabrakan=2 | langkah=49340 | epsilon=0.050 | update=48341
+Episode 34/36 | goal=True | tabrakan=0 | langkah=50217 | epsilon=0.050 | update=49218
+Episode 35/36 | goal=True | tabrakan=0 | langkah=50958 | epsilon=0.050 | update=49959
+Episode 36/36 | goal=True | tabrakan=1 | langkah=52148 | epsilon=0.050 | update=51149
+Evaluasi 1: goal=True | waktu=117.76s
+Evaluasi 2: goal=True | waktu=114.88s
+Evaluasi 3: goal=True | waktu=113.92s
+Evaluasi 4: goal=True | waktu=115.52s
+Evaluasi 5: goal=True | waktu=114.56s
+Evaluasi 6: goal=True | waktu=117.28s
+Evaluasi 7: goal=True | waktu=183.52s
+Evaluasi 8: goal=True | waktu=118.88s
+Evaluasi 9: goal=True | waktu=293.28s
+Evaluasi 10: goal=True | waktu=138.08s
+Evaluasi 11: goal=True | waktu=135.04s
+Evaluasi 12: goal=True | waktu=119.84s
+Uji rute 1 selesai.
+Uji rute 2 selesai.
+Uji rute 3 selesai.
+Uji rute 4 selesai.
+Uji rute 5 selesai.
+Uji rute 6 selesai.
+Uji rute 7 selesai.
+{
+  "training": {
+    "episodes": 36,
+    "steps": 52148,
+    "routes_found": 7,
+    "training_successes": 18,
+    "training_seconds": 225.8486755949998,
+    "gradient_updates": 51149,
+    "target_updates": 51
+  },
+  "checkpoint": "output/drl/models/last_model.pt",
+  "sha256": "415ae6a7673cb23be9eb12c43be8aac6baf93f1edc6c11787340e81a2e758545",
+  "episode": 36,
+  "epsilon": 0,
+  "online_frozen": true,
+  "evaluation": {
+    "runs": 12,
+    "successes": 12,
+    "failures": 0,
+    "success_rate": 1.0,
+    "collision_episodes": 0,
+    "collision_events": 0,
+    "timeouts": 0,
+    "search_exhausted": 0,
+    "average_reward": 357.73881057295563,
+    "median_reward": 318.58668468809725,
+    "average_steps": 876.3333333333334,
+    "median_steps": 739.5,
+    "average_duration_s": 140.21333333333334,
+    "best_success_s": 113.92,
+    "mean_distance_m": 23.128259403246275
+  },
+  "route_tests": 21,
+  "route_successes": 21,
+  "fastest_route": {
+    "route_id": 2,
+    "trial": 2,
+    "seed": 1,
+    "heading_rad": -0.1,
+    "timeout": false,
+    "success": true,
+    "collision_count": 0,
+    "search_exhausted": false,
+    "steps": 617,
+    "reward": 295.25707947447813,
+    "duration_s": 98.72,
+    "distance_m": 17.08040137308915,
+    "replay": [
+      [
+        -2.6,
+        -3.0
+      ],
+      [
+        -2.2,
+        -3.0
+      ],
+      [
+        -2.2,
+        -2.6
+      ],
+      [
+        -2.2,
+        -2.2
+      ],
+      [
+        -2.2,
+        -1.8
+      ],
+      [
+        -2.2,
+        -1.4000000000000001
+      ],
+      [
+        -2.6,
+        -1.4000000000000001
+      ],
+      [
+        -2.6,
+        -1.8
+      ],
+      [
+        -3.0,
+        -1.8
+      ],
+      [
+        -3.0,
+        -1.4000000000000001
+      ],
+      [
+        -3.0,
+        -1.0
+      ],
+      [
+        -3.0,
+        -0.6000000000000001
+      ],
+      [
+        -2.6,
+        -0.6000000000000001
+      ],
+      [
+        -2.6,
+        -0.20000000000000018
+      ],
+      [
+        -2.2,
+        -0.20000000000000018
+      ],
+      [
+        -2.2,
+        0.20000000000000018
+      ],
+      [
+        -2.6,
+        0.20000000000000018
+      ],
+      [
+        -2.6,
+        0.6000000000000001
+      ],
+      [
+        -2.6,
+        1.0
+      ],
+      [
+        -2.2,
+        1.0
+      ],
+      [
+        -2.2,
+        0.6000000000000001
+      ],
+      [
+        -1.8,
+        0.6000000000000001
+      ],
+      [
+        -1.8,
+        1.0
+      ],
+      [
+        -1.8,
+        1.4000000000000004
+      ],
+      [
+        -1.4000000000000001,
+        1.4000000000000004
+      ],
+      [
+        -1.0,
+        1.4000000000000004
+      ],
+      [
+        -1.0,
+        1.7999999999999998
+      ],
+      [
+        -1.0,
+        2.2
+      ],
+      [
+        -0.6000000000000001,
+        2.2
+      ],
+      [
+        -0.20000000000000018,
+        2.2
+      ],
+      [
+        -0.20000000000000018,
+        1.7999999999999998
+      ],
+      [
+        0.20000000000000018,
+        1.7999999999999998
+      ],
+      [
+        0.20000000000000018,
+        2.2
+      ],
+      [
+        0.6000000000000001,
+        2.2
+      ],
+      [
+        1.0,
+        2.2
+      ],
+      [
+        1.4000000000000004,
+        2.2
+      ],
+      [
+        1.7999999999999998,
+        2.2
+      ],
+      [
+        2.2,
+        2.2
+      ],
+      [
+        2.2,
+        2.6000000000000005
+      ],
+      [
+        2.2,
+        3.0
+      ],
+      [
+        2.6000000000000005,
+        3.0
+      ],
+      [
+        2.8,
+        2.8
+      ]
+    ],
+    "route": [
+      [
+        -2.6,
+        -3.0
+      ],
+      [
+        -2.2,
+        -3.0
+      ],
+      [
+        -2.2,
+        -2.6
+      ],
+      [
+        -2.2,
+        -2.2
+      ],
+      [
+        -2.2,
+        -1.8
+      ],
+      [
+        -2.2,
+        -1.4000000000000001
+      ],
+      [
+        -2.6,
+        -1.4000000000000001
+      ],
+      [
+        -2.6,
+        -1.8
+      ],
+      [
+        -3.0,
+        -1.8
+      ],
+      [
+        -3.0,
+        -1.4000000000000001
+      ],
+      [
+        -3.0,
+        -1.0
+      ],
+      [
+        -3.0,
+        -0.6000000000000001
+      ],
+      [
+        -2.6,
+        -0.6000000000000001
+      ],
+      [
+        -2.6,
+        -0.20000000000000018
+      ],
+      [
+        -2.2,
+        -0.20000000000000018
+      ],
+      [
+        -2.2,
+        0.20000000000000018
+      ],
+      [
+        -2.6,
+        0.20000000000000018
+      ],
+      [
+        -2.6,
+        0.6000000000000001
+      ],
+      [
+        -2.6,
+        1.0
+      ],
+      [
+        -2.2,
+        1.0
+      ],
+      [
+        -2.2,
+        0.6000000000000001
+      ],
+      [
+        -1.8,
+        0.6000000000000001
+      ],
+      [
+        -1.8,
+        1.0
+      ],
+      [
+        -1.8,
+        1.4000000000000004
+      ],
+      [
+        -1.4000000000000001,
+        1.4000000000000004
+      ],
+      [
+        -1.0,
+        1.4000000000000004
+      ],
+      [
+        -1.0,
+        1.7999999999999998
+      ],
+      [
+        -1.0,
+        2.2
+      ],
+      [
+        -0.6000000000000001,
+        2.2
+      ],
+      [
+        -0.20000000000000018,
+        2.2
+      ],
+      [
+        -0.20000000000000018,
+        1.7999999999999998
+      ],
+      [
+        0.20000000000000018,
+        1.7999999999999998
+      ],
+      [
+        0.20000000000000018,
+        2.2
+      ],
+      [
+        0.6000000000000001,
+        2.2
+      ],
+      [
+        1.0,
+        2.2
+      ],
+      [
+        1.4000000000000004,
+        2.2
+      ],
+      [
+        1.7999999999999998,
+        2.2
+      ],
+      [
+        2.2,
+        2.2
+      ],
+      [
+        2.2,
+        2.6000000000000005
+      ],
+      [
+        2.2,
+        3.0
+      ],
+      [
+        2.6000000000000005,
+        3.0
+      ],
+      [
+        2.8,
+        2.8
+      ]
+    ]
+  }
+}

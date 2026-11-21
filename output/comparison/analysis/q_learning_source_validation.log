@@ -1,0 +1,54 @@
+{
+  "result": "passed",
+  "episodes": {
+    "training": 36,
+    "evaluation": 12
+  },
+  "step_rows": 57424,
+  "step_phases": {
+    "training": 42710,
+    "evaluation": 14714
+  },
+  "learning_updates": {
+    "q": 37766
+  },
+  "decoded_primary": [
+    "training_full.mp4",
+    "training_overview.mp4",
+    "final_evaluation.mp4",
+    "best_successful_run.mp4",
+    "webots_evaluation.mp4"
+  ],
+  "videos_probed": 53,
+  "best": {
+    "filename": "best_successful_run.mp4",
+    "selection": "minimum successful time",
+    "run_id": "q_learning-5339bee874b3",
+    "algorithm": "q_learning",
+    "episode": "20",
+    "phase": "speed_test",
+    "recording_phase": "training",
+    "episode_key": "training-000020",
+    "total_steps": "710",
+    "total_reward": "197.6009397902672",
+    "average_reward_per_step": "0.2783111828031932",
+    "duration_simulation_s": "113.60000000000001",
+    "duration_wall_clock_s": "2.913276302999293",
+    "success": "True",
+    "collision": "True",
+    "collision_count": "1",
+    "timeout": "False",
+    "search_exhausted": "False",
+    "epsilon_start": "0.07406997698298323",
+    "epsilon_end": "0.07406997698298323",
+    "unique_states_visited": "142",
+    "replay_buffer_size": "",
+    "gradient_updates": "",
+    "best_reward_so_far": "362.1992059590718",
+    "best_successful_time_so_far": "113.60000000000001",
+    "distance_to_goal_m": "0.07160814106603634",
+    "first_row": "27416",
+    "last_row": "28125",
+    "frame_stride": 1
+  }
+}
