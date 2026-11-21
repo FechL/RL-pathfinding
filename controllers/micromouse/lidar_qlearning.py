@@ -13,8 +13,8 @@ ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
              (.12, 2.7), (.12, -2.7), (-.11, 0.), (0., 0.))
 LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
                  'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
-SAFE_DISTANCE = .12
-STATE_VERSION = 4
+SAFE_DISTANCE = .16
+STATE_VERSION = 5
 
 
 def safe_actions(lidar_sectors):
@@ -66,8 +66,18 @@ def aggregate_point_cloud(points, maximum=4.):
     return np.clip(minima,0.,maximum).astype(np.float32)
 
 
-def discretize_state(pose, goal, lidar_sectors, previous_action=None):
-    """Create a compact Markov state; no map or route labels are consumed."""
+def gps_cell(position, bounds, cell_size):
+    """Quantize GPS coordinates to the maze's regular cell grid."""
+    xmin,xmax,ymin,ymax=map(float,bounds)
+    width=max(1,round((xmax-xmin)/float(cell_size)))
+    height=max(1,round((ymax-ymin)/float(cell_size)))
+    x=min(width-1,max(0,int(math.floor((float(position[0])-xmin)/cell_size))))
+    y=min(height-1,max(0,int(math.floor((float(position[1])-ymin)/cell_size))))
+    return x,y
+
+
+def discretize_state(pose, goal, lidar_sectors, previous_action=None, *, position_cell):
+    """Create a compact state from GPS cell, goal-relative data and LiDAR."""
     pose = np.asarray(pose, dtype=float)
     goal = np.asarray(goal, dtype=float)
     delta = goal-pose[:2]
@@ -77,7 +87,7 @@ def discretize_state(pose, goal, lidar_sectors, previous_action=None):
     distance_bin = int(np.digitize(distance, [.15, .35, .7, 1.2, 2., 3.5]))
     lidar_bins = tuple(int(x) for x in np.digitize(np.asarray(lidar_sectors), [SAFE_DISTANCE, .45]))
     last_action = len(ACTION_NAMES) if previous_action is None else int(previous_action)
-    return (bearing_bin, distance_bin, *lidar_bins, last_action)
+    return (*map(int,position_cell), bearing_bin, distance_bin, *lidar_bins, last_action)
 
 
 class TabularLidarQ:
@@ -151,7 +161,7 @@ class TabularLidarQ:
     def save(self, path, metadata=None):
         payload=dict(format_version=STATE_VERSION, algorithm='tabular_q_lidar',
                      alpha=self.alpha, gamma=self.gamma,
-                     state=('relative goal bearing 16 bins, goal distance 7 bins, '
+                     state=('GPS maze-cell x/y, relative goal bearing 16 bins, goal distance 7 bins, '
                             '8 lidar sector minimums quantized to 3 levels, previous action'),
                      lidar_sector_order=LIDAR_SECTORS,
                      lidar_bins={'near_m':SAFE_DISTANCE,'medium_m':.45,'maximum_range_m':4.},

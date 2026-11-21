@@ -1,18 +1,20 @@
 # Micromouse Tabular Q-Learning with LiDAR
 
-The default learner is **tabular Q-learning**. The robot knows its current
-pose and the goal coordinates, but it receives no route or map path to follow.
+The default learner is **tabular Q-learning**. The robot uses GPS position and
+the goal coordinates, but receives no route or map path to follow.
 A 360° Webots LiDAR produces 128 range returns; the controller aggregates
 those readings into eight sector minimums (front, front-left, left, rear-left,
 rear, rear-right, right, front-right). Each sector becomes one of three
-distance bins for a sparse Q-table. The state also includes 16 bins of relative
-goal bearing, seven goal-distance bins, and the previous action. Seven smooth
+distance bins for a sparse Q-table. The state also includes the GPS maze-cell,
+16 bins of relative goal bearing, seven goal-distance bins, and the previous action. Seven smooth
 forward/arc/turn/reverse/stop actions provide smooth wheel targets. A LiDAR
-safety mask checks each maneuver's travel direction at 0.12 m and only allows
+safety mask checks each maneuver's travel direction at 0.16 m and only allows
 the stop fallback when no movement direction is clear.
 
-Reward uses GPS-equivalent goal-distance progress and strongly penalizes wall
-collisions (`-30`); reaching the goal gives `+60`. The forward/diagonal-forward
+Reward uses GPS goal-distance progress and strongly penalizes wall
+collisions (`-100`); reaching the goal gives `+120`. First entry to a grid cell
+earns a small exploration bonus, while revisiting a cell costs reward. The
+forward/diagonal-forward
 LiDAR clearance penalty has 1.5× weight compared with reverse, and turning
 without goal progress also carries a penalty. GPS travel distance adds a small
 per-metre cost to discourage long loops; the monitor shows both distance from

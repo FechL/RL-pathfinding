@@ -14,8 +14,9 @@ sys.path.insert(0,str(ROOT/'controllers/micromouse'))
 sys.path.insert(0,str(ROOT/'tools'))
 
 from continuous_control import NavigationMap
-from lidar_q_env import (FORWARD_LIDAR_WEIGHT,GPS_TRAVEL_COST_PER_METER,
-                         LidarQEnvironment)
+from lidar_q_env import (COLLISION_PENALTY,FORWARD_LIDAR_WEIGHT,GOAL_REWARD,
+                         GPS_TRAVEL_COST_PER_METER,NEW_CELL_BONUS,
+                         REVISITED_CELL_PENALTY,LidarQEnvironment)
 from lidar_qlearning import ACTION_NAMES,TabularLidarQ,safe_actions
 from q_learning import scene_signature
 from train_q_learning import read_world
@@ -94,13 +95,14 @@ def main():
                   alpha=args.alpha,gamma=args.gamma,exploration_fraction=args.exploration_fraction,
                   lidar='Webots planar 360 degree LiDAR; 128 raw returns aggregated to 8 sector minima',
                   lidar_sector_order=['front','front-left','left','rear-left','rear','rear-right','right','front-right'],
-                  state_schema='relative goal bearing 16 bins; goal distance 7 bins; eight lidar ranges each 3 bins; previous action',
+                  state_schema='GPS maze-cell x/y; relative goal bearing 16 bins; goal distance 7 bins; eight lidar ranges each 3 bins; previous action',
                   action_names=ACTION_NAMES,goal_input='known goal coordinates and relative bearing/distance',
-                  reward='8 x GPS goal-distance progress - 0.025 per decision - 0.5 per metre travelled - maneuver-direction clearance penalty (forward LiDAR weight 1.5x) - low-progress spin penalty; +60 goal; -30 collision',
+                  reward='8 x GPS goal-distance progress - 0.025 per decision - 0.5 per metre travelled +0.8 on first cell entry / -0.4 on re-entry - maneuver-direction clearance penalty (forward LiDAR weight 1.5x) - low-progress spin penalty; +120 goal; -100 collision',
                   forward_lidar_reward_weight=FORWARD_LIDAR_WEIGHT,
                   gps_travel_cost_per_meter=GPS_TRAVEL_COST_PER_METER,
-                  lidar_safety_mask='blocks only actions whose forward, diagonal, or rear sector is under 0.12 m; stop is a fallback only when no movement is safe',
-                  collision_reward=-30.,goal_reward=60.,maze_signature=signature)
+                  new_cell_bonus=NEW_CELL_BONUS,revisited_cell_penalty=REVISITED_CELL_PENALTY,
+                  lidar_safety_mask='blocks only actions whose forward, diagonal, or rear sector is under 0.16 m; stop is a fallback only when no movement is safe',
+                  collision_reward=COLLISION_PENALTY,goal_reward=GOAL_REWARD,maze_signature=signature)
     (run_dir/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
     view=None
     if args.render:

@@ -84,10 +84,10 @@ class LidarQView:
 
     @staticmethod
     def _state_text(state):
-        bearing,distance,*rest=state
+        x_cell,y_cell,bearing,distance,*rest=state
         lidar=rest[:8]
         last=rest[8]
-        return f"b{bearing:02d} d{distance} | {''.join(map(str,lidar))} | prev={last}"
+        return f"p{x_cell},{y_cell} b{bearing:02d} d{distance} | {''.join(map(str,lidar))} | a{last}"
 
     def _draw_table(self,agent,current_state):
         cv2=self.cv2
@@ -98,7 +98,7 @@ class LidarQView:
                 self.table_keys.append(key)
             self.table_synced_size=len(agent.state_order)
         frame=np.full((self.height,self.width,3),249,dtype=np.uint8)
-        cv2.putText(frame,'Q-table diskret: goal-relative + 8 sektor LiDAR',
+        cv2.putText(frame,'Q-table: GPS grid + goal-relative + 8 sektor LiDAR',
                     (24,36),cv2.FONT_HERSHEY_SIMPLEX,.62,(36,48,60),2,cv2.LINE_AA)
         cv2.putText(frame,f'{len(agent.q):,} state tersimpan | state sekarang: {self._state_text(current_state)}',
                     (24,64),cv2.FONT_HERSHEY_SIMPLEX,.39,(65,76,87),1,cv2.LINE_AA)
@@ -141,7 +141,7 @@ class LidarQView:
             cv2.line(frame,(x,yy+37),(self.width-20,yy+37),(220,225,229),1)
             cx=x
             state_label=self._state_text(state)
-            representative_ranges=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[2:10])]
+            representative_ranges=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[4:12])]
             valid_actions=safe_actions(representative_ranges)
             best_action=valid_actions[int(np.argmax(values[list(valid_actions)]))]
             for col,(label,width) in enumerate(columns):
@@ -194,8 +194,8 @@ class LidarQView:
               'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
-              f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | goal {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | wall {env.last_reward_parts.get("close_wall",0):+.2f}',
-              f'Tabrakan -30 | goal +60 | timeout {env.max_steps*self.decision_seconds if hasattr(self,"decision_seconds") else env.max_steps*.16:.0f}s',
+              f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | goal {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | cell {env.last_reward_parts.get("cell_exploration",0):+.1f}',
+              f'Tabrakan -100 | goal +120 | timeout {env.max_steps*env.decision_seconds:.0f}s',
               f'Sukses 100 ep: {100*sum(self.successes)/max(1,len(self.successes)):.1f}%',
               f'Tabrakan 100 ep: {100*sum(self.collisions)/max(1,len(self.collisions)):.1f}%']
         for i,text in enumerate(info):

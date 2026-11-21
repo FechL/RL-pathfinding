@@ -10,7 +10,8 @@ import numpy as np
 
 from continuous_control import ControlConfig
 from lidar_qlearning import (ACTION_NAMES,ACTION_VW,TabularLidarQ,
-                             aggregate_point_cloud,discretize_state,safe_actions)
+                             aggregate_point_cloud,discretize_state,gps_cell,
+                             safe_actions)
 from planner import ROBOT_RADIUS,physical_clearance,path_length
 from q_learning import ContinuousMaze,scene_signature
 
@@ -73,7 +74,8 @@ def run(supervisor):
     scan=lidar.getPointCloud()
     sectors=aggregate_point_cloud(scan)
     pose=np.array([*gps.getValues()[:2],imu.getRollPitchYaw()[2]])
-    state=discretize_state(pose,goal,sectors,previous_action)
+    state=discretize_state(pose,goal,sectors,previous_action,
+                           position_cell=gps_cell(pose[:2],bounds,cell_size))
     policy_ticks=0
     print(f'Tabular Q + LiDAR; table states={len(agent.q):,}; goal={tuple(goal)}; policy={policy_path}',flush=True)
 
@@ -94,7 +96,8 @@ def run(supervisor):
         if policy_ticks%decision_ticks==0:
             scan=lidar.getPointCloud()
             sectors=aggregate_point_cloud(scan)
-            state=discretize_state(pose,goal,sectors,previous_action)
+            state=discretize_state(pose,goal,sectors,previous_action,
+                                   position_cell=gps_cell(pose[:2],bounds,cell_size))
             values=agent.values(state)
             allowed=safe_actions(sectors)
             action=max(allowed,key=lambda candidate:float(values[candidate]))

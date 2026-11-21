@@ -3,11 +3,16 @@ import math
 
 import numpy as np
 
-from lidar_qlearning import ACTION_NAMES, ACTION_VW, aggregate_lidar, discretize_state
+from lidar_qlearning import (ACTION_NAMES,ACTION_VW,aggregate_lidar,
+                             discretize_state,gps_cell)
 from planner import ROBOT_RADIUS, SAFETY_MARGIN
 
 FORWARD_LIDAR_WEIGHT=1.5
 GPS_TRAVEL_COST_PER_METER=.5
+NEW_CELL_BONUS=.8
+REVISITED_CELL_PENALTY=-.4
+COLLISION_PENALTY=-100.
+GOAL_REWARD=120.
 
 
 class LidarQEnvironment:
@@ -32,6 +37,8 @@ class LidarQEnvironment:
         self.last_reward_parts={}
         self.last_state=None
         self.last_position=self.nav.start.copy()
+        self.cell_visit_counts={}
+        self.last_cell=None
 
     def reset(self, heading=0.):
         self.pose=np.array([*self.nav.start,float(heading)],dtype=float)
@@ -49,7 +56,10 @@ class LidarQEnvironment:
         self.last_success=False
         self.last_reward_parts={}
         self.last_position=self.pose[:2].copy()
-        self.last_state=discretize_state(self.pose,self.nav.goal,self.lidar_sectors)
+        self.last_cell=self.nav.maze.state(self.pose[:2])
+        self.cell_visit_counts={self.last_cell:1}
+        self.last_state=discretize_state(self.pose,self.nav.goal,self.lidar_sectors,
+                                         position_cell=gps_cell(self.pose[:2],self.nav.bounds,self.nav.cell_size))
         return self.last_state
 
     def step(self, action):
@@ -75,6 +85,13 @@ class LidarQEnvironment:
         self.steps+=1
         self.lidar_scan=self.nav.lidar_scan(self.pose)
         self.lidar_sectors=aggregate_lidar(self.lidar_scan)
+        current_cell=self.nav.maze.state(self.pose[:2])
+        cell_exploration_reward=0.
+        if current_cell!=self.last_cell:
+            count=self.cell_visit_counts.get(current_cell,0)
+            cell_exploration_reward=(NEW_CELL_BONUS if count==0 else REVISITED_CELL_PENALTY)
+            self.cell_visit_counts[current_cell]=count+1
+            self.last_cell=current_cell
         travelled_delta=float(np.linalg.norm(self.pose[:2]-old_position))
         self.travelled_distance+=travelled_delta
         distance_from_base=float(np.linalg.norm(self.pose[:2]-self.nav.start))
@@ -99,15 +116,16 @@ class LidarQEnvironment:
             np.clip((.24-maneuver_clearance)/.24,0.,1.))
         yaw_change=(self.pose[2]-old_heading+math.pi)%(2*math.pi)-math.pi
         spinning_penalty=-.18 if abs(yaw_change)>.30 and progress_reward<.015 else 0.
-        collision_penalty=-30. if collision else 0.
-        goal_reward=60. if success else 0.
+        collision_penalty=COLLISION_PENALTY if collision else 0.
+        goal_reward=GOAL_REWARD if success else 0.
         stalled_penalty=-.10 if np.linalg.norm(self.pose[:2]-self.last_position)<.002 else 0.
         self.last_position=self.pose[:2].copy()
-        reward=(progress_reward+time_cost+gps_travel_cost+close_wall_penalty+collision_penalty+
-                goal_reward+stalled_penalty+spinning_penalty)
+        reward=(progress_reward+time_cost+gps_travel_cost+cell_exploration_reward+
+                close_wall_penalty+collision_penalty+goal_reward+stalled_penalty+spinning_penalty)
         terminal=bool(collision or success)
         truncated=bool(self.steps>=self.max_steps and not terminal)
-        next_state=discretize_state(self.pose,self.nav.goal,self.lidar_sectors,action)
+        next_state=discretize_state(self.pose,self.nav.goal,self.lidar_sectors,action,
+                                    position_cell=gps_cell(self.pose[:2],self.nav.bounds,self.nav.cell_size))
         self.last_state=next_state
         self.previous_action=action
         self.episode_return+=reward
@@ -116,6 +134,7 @@ class LidarQEnvironment:
         self.last_success=success
         self.last_reward_parts=dict(progress=progress_reward,time=time_cost,
                                     gps_travel=gps_travel_cost,
+                                    cell_exploration=cell_exploration_reward,
                                     close_wall=close_wall_penalty,collision=collision_penalty,
                                     goal=goal_reward,stalled=stalled_penalty,
                                     spinning=spinning_penalty,lidar_weight=lidar_weight,
@@ -123,6 +142,7 @@ class LidarQEnvironment:
         info=dict(collision=collision,success=success,distance_to_goal_m=new_distance,
                   distance_from_base_m=distance_from_base,
                   travelled_distance_m=self.travelled_distance,
+                  cell_exploration_reward=cell_exploration_reward,
                   front_clearance_m=frontal_clearance,action=ACTION_NAMES[action],
                   maneuver_clearance_m=maneuver_clearance,lidar_weight=lidar_weight,
                   reward_parts=self.last_reward_parts.copy())
