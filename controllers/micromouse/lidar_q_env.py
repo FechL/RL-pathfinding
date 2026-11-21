@@ -33,7 +33,7 @@ class LidarQEnvironment:
         self.pose=np.zeros(3)
         self.wheels=np.zeros(2)
         self.lidar_scan=np.full(128,4.,dtype=np.float32)
-        self.lidar_sectors=np.full(8,4.,dtype=np.float32)
+        self.lidar_sectors=np.full(5,4.,dtype=np.float32)
         self.steps=0
         self.episode_return=0.
         self.travelled_distance=0.
@@ -72,7 +72,7 @@ class LidarQEnvironment:
         self.last_state=discretize_state(self.pose,self.goal,self.lidar_sectors)
         return self.last_state
 
-    def step(self, action, *, final_goal=True):
+    def step(self, action, *, final_goal=True, scanning=False):
         if self.finished:
             raise RuntimeError('Reset before beginning another episode')
         if not 0<=int(action)<len(ACTION_NAMES):
@@ -98,20 +98,18 @@ class LidarQEnvironment:
         self.travelled_distance+=travelled_delta
         distance_from_base=float(np.linalg.norm(self.pose[:2]-self.base_start))
         new_distance=float(np.linalg.norm(self.goal-self.pose[:2]))
-        waypoint_reached=not collision and new_distance<=(GOAL_TOLERANCE if final_goal else WAYPOINT_TOLERANCE)
+        waypoint_reached=not scanning and not collision and new_distance<=(GOAL_TOLERANCE if final_goal else WAYPOINT_TOLERANCE)
         success=bool(waypoint_reached and final_goal)
         waypoint_reward=WAYPOINT_REWARD if waypoint_reached and not final_goal else 0.
-        progress_reward=4.*(old_distance-new_distance)
+        progress_reward=0. if scanning else 4.*(old_distance-new_distance)
         time_cost=-.025
         gps_travel_cost=-GPS_TRAVEL_COST_PER_METER*travelled_delta
-        frontal_clearance=float(np.min(self.lidar_sectors[[7,0,1]]))
+        frontal_clearance=float(np.min(self.lidar_sectors[[4,0,1]]))
         if action==1:
             maneuver_clearance=float(np.min(self.lidar_sectors[[0,1]]))
         elif action==2:
-            maneuver_clearance=float(np.min(self.lidar_sectors[[0,7]]))
-        elif action==5:
-            maneuver_clearance=float(self.lidar_sectors[4])
-        elif action in (3,4,6):
+            maneuver_clearance=float(np.min(self.lidar_sectors[[0,4]]))
+        elif action in (3,4,5):
             maneuver_clearance=float(self.lidar_sectors.min())
         else:
             maneuver_clearance=float(self.lidar_sectors[0])
@@ -119,10 +117,10 @@ class LidarQEnvironment:
         close_wall_penalty=-.45*lidar_weight*float(
             np.clip((.24-maneuver_clearance)/.24,0.,1.))
         alignment_gain=old_bearing-abs(waypoint_bearing(self.pose,self.goal))
-        alignment_reward=.20*alignment_gain
+        alignment_reward=0. if scanning else .20*alignment_gain
         collision_penalty=COLLISION_PENALTY if collision else 0.
         goal_reward=GOAL_REWARD if success else 0.
-        stalled_penalty=-.10 if travelled_delta<.002 and alignment_gain<.05 else 0.
+        stalled_penalty=-.10 if not scanning and travelled_delta<.002 and alignment_gain<.05 else 0.
         reward=(progress_reward+time_cost+gps_travel_cost+close_wall_penalty+
                 collision_penalty+goal_reward+stalled_penalty+alignment_reward)
         reward+=waypoint_reward

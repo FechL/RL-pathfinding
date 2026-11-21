@@ -1,4 +1,4 @@
-"""Sparse tabular Q-learning from a 360-degree lidar and a known goal pose."""
+"""Sparse tabular Q-learning from a front-facing 180-degree LiDAR and a known goal pose."""
 from collections import deque
 import json
 import math
@@ -9,15 +9,15 @@ import numpy as np
 from planner import ROBOT_RADIUS, SAFETY_MARGIN
 
 ACTION_NAMES = ('Maju', 'Lengkung kiri', 'Lengkung kanan',
-                'Putar kiri', 'Putar kanan', 'Mundur', 'Berhenti')
+                'Putar kiri', 'Putar kanan', 'Berhenti')
 ACTION_VW = ((.23, 0.), (.19, 1.15), (.19, -1.15),
-             (0., 2.7), (0., -2.7), (-.11, 0.), (0., 0.))
-LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Belakang-kiri',
-                 'Belakang', 'Belakang-kanan', 'Kanan', 'Depan-kanan')
-LIDAR_STATE_SECTORS = (0,1,2,4,6,7)
+             (0., 2.7), (0., -2.7), (0., 0.))
+LIDAR_SECTORS = ('Depan', 'Depan-kiri', 'Kiri', 'Kanan', 'Depan-kanan')
+FRONT_HALF_ANGLE = math.pi / 2
 SAFE_DISTANCE = .16
-STATE_VERSION = 8
-STATE_SPACE_SIZE = 8*4*(3**len(LIDAR_STATE_SECTORS))
+STATE_VERSION = 9
+STATE_SPACE_SIZE = 8 * 4 * 3**len(LIDAR_SECTORS)
+STOP_ACTION = len(ACTION_NAMES) - 1
 
 
 def safe_actions(lidar_sectors):
@@ -33,13 +33,11 @@ def safe_actions(lidar_sectors):
         allowed.append(0)
     if sectors[0]>=SAFE_DISTANCE and sectors[1]>=SAFE_DISTANCE:
         allowed.append(1)
-    if sectors[0]>=SAFE_DISTANCE and sectors[7]>=SAFE_DISTANCE:
+    if sectors[0]>=SAFE_DISTANCE and sectors[4]>=SAFE_DISTANCE:
         allowed.append(2)
     if sectors.min() >= ROBOT_RADIUS + SAFETY_MARGIN:
         allowed.extend((3, 4))
-    if sectors[4]>=SAFE_DISTANCE:
-        allowed.append(5)
-    return tuple(allowed) if allowed else (6,)
+    return tuple(allowed) if allowed else (STOP_ACTION,)
 
 
 def waypoint_bearing(pose, target):
@@ -62,49 +60,45 @@ class WaypointRecovery:
             self.best_distance = distance
             self.last_progress = seconds
         self.active = self.active or seconds - self.last_progress >= 2.
-        if not self.active:
-            return allowed
-
         bearing = waypoint_bearing(pose, target)
         arc, pivot = (1, 3) if bearing >= 0 else (2, 4)
+        if abs(bearing) > FRONT_HALF_ANGLE:
+            return (pivot,) if pivot in allowed else (STOP_ACTION,)
+        if not self.active:
+            return allowed
         if abs(bearing) > .40 and pivot in allowed:
             return (pivot,)
         if abs(bearing) <= .40:
             forward = tuple(action for action in (0, arc) if action in allowed)
             if forward:
                 return forward
-            if abs(bearing) < .12 and 5 in allowed:
-                return (5,)
         return allowed
 
 
-def aggregate_lidar(scan, maximum=4.):
-    """Reduce hundreds of range returns to minimum distance in eight sectors.
+def beam_angles(resolution):
+    return np.linspace(-FRONT_HALF_ANGLE, FRONT_HALF_ANGLE, resolution)
 
-    The Webots scanner starts on the robot's right and proceeds
-    counter-clockwise. Sector zero is the front, then front-left, left, etc.
-    """
+
+def aggregate_front(angles, distances, maximum):
+    minima = np.full(len(LIDAR_SECTORS), maximum, dtype=np.float32)
+    # Angular bins from right to left, mapped to the order shown in the monitor.
+    sector_order = np.array([3, 4, 0, 1, 2])
+    bins = np.clip(np.floor(angles / (math.pi / 4) + 2.5).astype(int), 0, 4)
+    np.minimum.at(minima, sector_order[bins], np.clip(distances, 0., maximum))
+    return minima
+
+
+def aggregate_lidar(scan, maximum=4.):
     values = np.asarray(scan, dtype=float).reshape(-1)
     values = np.nan_to_num(values, nan=maximum, posinf=maximum, neginf=0.)
-    values = np.clip(values, 0., maximum)
-    angles = -math.pi/2 + np.arange(len(values))*2*math.pi/max(1, len(values))
-    sectors = np.floor(angles/(math.pi/4)+.5).astype(int) % 8
-    minima = np.full(8, maximum, dtype=float)
-    np.minimum.at(minima, sectors, values)
-    return minima.astype(np.float32)
+    return aggregate_front(beam_angles(len(values)), values, maximum)
 
 
 def aggregate_point_cloud(points, maximum=4.):
-    """Aggregate Webots local-frame lidar points into the same 8 sectors."""
-    minima=np.full(8,float(maximum),dtype=float)
-    for point in points:
-        x,y=float(point.x),float(point.y)
-        distance=math.hypot(x,y)
-        if not math.isfinite(distance):
-            continue
-        sector=int(math.floor(math.atan2(y,x)/(math.pi/4)+.5))%8
-        minima[sector]=min(minima[sector],distance)
-    return np.clip(minima,0.,maximum).astype(np.float32)
+    hits = np.array([(point.x, point.y) for point in points]).reshape(-1, 2)
+    hits = hits[np.isfinite(hits).all(axis=1) & (hits[:, 0] >= -1e-5)]
+    return aggregate_front(np.arctan2(hits[:, 1], hits[:, 0]),
+                           np.hypot(hits[:, 0], hits[:, 1]), maximum)
 
 
 def discretize_state(pose, goal, lidar_sectors):
@@ -116,7 +110,7 @@ def discretize_state(pose, goal, lidar_sectors):
     bearing = waypoint_bearing(pose, goal)
     bearing_bin = min(7, int((bearing+math.pi)/(2*math.pi/8)))
     distance_bin = int(np.digitize(distance, [.10,.25,.50]))
-    selected=np.asarray(lidar_sectors,dtype=float)[list(LIDAR_STATE_SECTORS)]
+    selected=np.asarray(lidar_sectors,dtype=float)
     lidar_bins = tuple(int(x) for x in np.digitize(selected, [SAFE_DISTANCE, .45]))
     return (bearing_bin,distance_bin,*lidar_bins)
 
@@ -193,10 +187,10 @@ class TabularLidarQ:
         payload=dict(format_version=STATE_VERSION, algorithm='tabular_q_lidar',
                      alpha=self.alpha, gamma=self.gamma,
                      state=('next-waypoint relative bearing 8 bins, waypoint distance 4 bins, '
-                            'six directional lidar minimums quantized to 3 levels'),
+                            'five forward LiDAR minimums quantized to 3 levels'),
                      state_space_upper_bound=STATE_SPACE_SIZE,
                      lidar_sector_order=LIDAR_SECTORS,
-                     lidar_state_sectors=[LIDAR_SECTORS[i] for i in LIDAR_STATE_SECTORS],
+                     lidar_fov_degrees=180,
                      lidar_bins={'near_m':SAFE_DISTANCE,'medium_m':.45,'maximum_range_m':4.},
                      actions=[dict(name=name,linear_m_s=vw[0],yaw_rad_s=vw[1])
                               for name,vw in zip(ACTION_NAMES,ACTION_VW)],

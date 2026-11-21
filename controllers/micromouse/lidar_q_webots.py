@@ -53,6 +53,8 @@ def run(supervisor):
     gps=supervisor.getDevice('gps');gps.enable(timestep)
     imu=supervisor.getDevice('imu');imu.enable(timestep)
     lidar=supervisor.getDevice('lidar');lidar.enable(timestep);lidar.enablePointCloud()
+    if not math.isclose(lidar.getFov(), math.pi, rel_tol=1e-5):
+        raise ValueError('The Q controller requires a front-facing 180-degree LiDAR')
     motors=[supervisor.getDevice('left wheel motor'),supervisor.getDevice('right wheel motor')]
     for motor in motors:
         motor.setPosition(float('inf'));motor.setVelocity(0.)
@@ -110,32 +112,39 @@ def run(supervisor):
         needs_target = target is None or (
             not search.final and math.dist(point, target) <= .055
         )
-        if needs_target or policy_ticks >= decision_ticks:
+        if steps == 0 or policy_ticks >= decision_ticks or (needs_target and target is not None):
             scan = lidar.getPointCloud()
             if needs_target:
                 target = search.next_target(pose, [(hit.x, hit.y) for hit in scan])
-                if target is None:
+                if target is None and search.scan_bearing is None:
                     exhausted = True
                     break
-                recovery = WaypointRecovery()
+                if target is not None:
+                    recovery = WaypointRecovery()
                 if show:
                     view.path = search.route
                     view.explored = [search.center(cell) for cell in search.edges]
                     view.background = view.draw_background()
             sectors=aggregate_point_cloud(scan)
-            state=discretize_state(pose,target,sectors)
-            values=agent.values(state)
-            allowed=recovery.actions(pose,target,sectors,supervisor.getTime()-began)
-            action=max(allowed,key=lambda candidate:float(values[candidate]))
+            if target is None:
+                action = search.scan_action(sectors)
+                state = None
+            else:
+                state=discretize_state(pose,target,sectors)
+                values=agent.values(state)
+                allowed=recovery.actions(pose,target,sectors,supervisor.getTime()-began)
+                action=max(allowed,key=lambda candidate:float(values[candidate]))
             policy_ticks=0
         commands=config.wheels_for_velocity(*ACTION_VW[action],commands,timestep/1000)
         for motor,speed in zip(motors,commands):motor.setVelocity(float(speed))
         telemetry.append(dict(time_s=supervisor.getTime()-began,pose=pose.tolist(),
-                              search_path_index=len(search.route),target=list(target),
-                              distance_to_waypoint_m=math.dist(point,target),distance_to_goal_m=goal_error,
-                              q_state=list(state),q_values=agent.values(state).tolist(),
+                              search_path_index=len(search.route),target=list(target) if target is not None else None,
+                              distance_to_waypoint_m=math.dist(point,target) if target is not None else None,distance_to_goal_m=goal_error,
+                              q_state=list(state) if state is not None else None,
+                              q_values=agent.values(state).tolist() if state is not None else None,
+                              scanning=target is None,
                               action=ACTION_NAMES[action],action_index=action,
-                              waypoint_recovery=recovery.active,
+                              waypoint_recovery=target is not None and recovery.active,
                               lidar_sector_min_m=sectors.tolist(),lidar_points=len(scan),
                               commanded_wheels=commands.tolist(),clearance_m=physical))
         steps+=1;policy_ticks+=1

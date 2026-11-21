@@ -5,7 +5,7 @@ from collections import deque
 
 import numpy as np
 
-from lidar_qlearning import (ACTION_NAMES,LIDAR_SECTORS,LIDAR_STATE_SECTORS,
+from lidar_qlearning import (ACTION_NAMES,beam_angles,
                              SAFE_DISTANCE,STATE_SPACE_SIZE,safe_actions)
 
 
@@ -97,7 +97,7 @@ class LidarQView:
                 self.table_keys.append(key)
             self.table_synced_size=len(agent.state_order)
         frame=np.full((self.height,self.width,3),249,dtype=np.uint8)
-        cv2.putText(frame,'Q-table: target-relative + 6 sektor LiDAR',
+        cv2.putText(frame,'Q-table: target-relative + 5 sektor LiDAR',
                     (24,36),cv2.FONT_HERSHEY_SIMPLEX,.62,(36,48,60),2,cv2.LINE_AA)
         cv2.putText(frame,f'{len(agent.q):,}/{STATE_SPACE_SIZE:,} state tersimpan | sekarang: {self._state_text(current_state)}',
                     (24,64),cv2.FONT_HERSHEY_SIMPLEX,.39,(65,76,87),1,cv2.LINE_AA)
@@ -106,7 +106,7 @@ class LidarQView:
         cv2.putText(frame,'< sebelumnya',(self.width-258,39),cv2.FONT_HERSHEY_SIMPLEX,.34,(40,52,64),1,cv2.LINE_AA)
         cv2.putText(frame,'berikutnya >',(self.width-130,39),cv2.FONT_HERSHEY_SIMPLEX,.34,(40,52,64),1,cv2.LINE_AA)
         columns=[('State',265),('Maju',128),('Ar kiri',128),('Ar kanan',128),
-                 ('Putar kiri',128),('Putar kanan',128),('Mundur',128),('Stop',128),('N',58)]
+                 ('Putar kiri',128),('Putar kanan',128),('Stop',128),('N',58)]
         x=20;y=108
         cv2.rectangle(frame,(x,y),(self.width-20,y+34),(44,67,86),-1)
         cx=x
@@ -140,14 +140,12 @@ class LidarQView:
             cv2.line(frame,(x,yy+37),(self.width-20,yy+37),(220,225,229),1)
             cx=x
             state_label=self._state_text(state)
-            representative_ranges=np.full(8,.50,dtype=float)
             bins=np.asarray((SAFE_DISTANCE*.5,.30,.50),dtype=float)[list(state[2:])]
-            representative_ranges[list(LIDAR_STATE_SECTORS)]=bins
-            valid_actions=current_actions if is_current else safe_actions(representative_ranges)
+            valid_actions=current_actions if is_current else safe_actions(bins)
             best_action=valid_actions[int(np.argmax(values[list(valid_actions)]))]
             for col,(label,width) in enumerate(columns):
                 if col==0:text=('AKTIF | '+state_label) if is_current else state_label
-                elif 1<=col<=7:
+                elif 1<=col<=len(ACTION_NAMES):
                     value=float(values[col-1]);text=f'{value:+.3f}'
                     color=(37,110,54) if value>0 else (47,55,64) if abs(value)<1e-6 else (50,65,190)
                     cv2.putText(frame,text,(cx+8,yy+24),cv2.FONT_HERSHEY_SIMPLEX,.37,color,1,cv2.LINE_AA)
@@ -168,9 +166,10 @@ class LidarQView:
         label=(id(env),episode)
         if label!=self.episode_key:self.trail=[];self.episode_key=label
         # Display a thin subset of raw beams; the Q state uses all 128.
+        angles = beam_angles(len(env.lidar_scan))
         for index in range(0,len(env.lidar_scan),4):
             distance=float(env.lidar_scan[index])
-            angle=env.pose[2]-math.pi/2+index*2*math.pi/len(env.lidar_scan)
+            angle=env.pose[2]+angles[index]
             origin=env.pose[:2]
             end=origin+distance*np.array([math.cos(angle),math.sin(angle)])
             color=(72,155,86) if distance>1. else (65,172,221) if distance>.35 else (65,73,213)
@@ -184,7 +183,7 @@ class LidarQView:
         cv2.line(frame,point,target,(112,153,190),1,cv2.LINE_AA)
         nose=self.pixel(env.pose[:2]+.15*np.array([math.cos(env.pose[2]),math.sin(env.pose[2])]))
         cv2.line(frame,point,nose,(38,40,47),2,cv2.LINE_AA)
-        cv2.putText(frame,'TABULAR Q MOTION CONTROL + LIDAR',(18,29),cv2.FONT_HERSHEY_SIMPLEX,.52,(35,48,60),2,cv2.LINE_AA)
+        cv2.putText(frame,'TABULAR Q MOTION CONTROL + LIDAR 180',(18,29),cv2.FONT_HERSHEY_SIMPLEX,.52,(35,48,60),2,cv2.LINE_AA)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(213,229,241),-1)
         cv2.rectangle(frame,(self.button[0],self.button[1]),(self.button[2],self.button[3]),(112,143,165),1)
         cv2.putText(frame,'BUKA Q-TABLE  [T / Q]',(self.button[0]+18,37),cv2.FONT_HERSHEY_SIMPLEX,.43,(38,58,72),1,cv2.LINE_AA)
@@ -195,8 +194,8 @@ class LidarQView:
               f'Reward akumulasi: {env.episode_return:+.2f}',
               f'Target lokal #{env.waypoint_index} | target {np.linalg.norm(env.goal-env.pose[:2]):.2f}m | base {np.linalg.norm(env.pose[:2]-env.base_start):.2f}m',
               f'Jarak jalan {env.travelled_distance:.2f}m | aksi: {ACTION_NAMES[env.previous_action] if env.previous_action is not None else "-"}',
-              f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)} | Mode: {"pemulihan" if env.recovery_active else "normal"}',
-              'Sektor: D, DK, K, BK, B, BR, Kn, DKn (meter)',
+              f'Aksi aman LiDAR: {len(safe_actions(env.lidar_sectors))}/{len(ACTION_NAMES)} | Mode: {"pindai cabang" if env.scanning else "pemulihan" if env.recovery_active else "normal"}',
+              'Sektor: D, DK, K, Kn, DKn (meter)',
               f'LiDAR: {" ".join(f"{v:.2f}" for v in env.lidar_sectors)}',
               f'Front clearance: {float(env.lidar_sectors[0]):.2f} m',
               f'LiDAR x{env.last_reward_parts.get("lidar_weight",1):.1f} | waypoint {env.last_reward_parts.get("progress",0):+.2f} | GPS {env.last_reward_parts.get("gps_travel",0):+.2f} | wall {env.last_reward_parts.get("close_wall",0):+.2f}',

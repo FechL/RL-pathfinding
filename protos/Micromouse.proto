@@ -1,6 +1,6 @@
 #VRML_SIM R2025a utf8
 # template language: javascript
-# Small differential-drive micromouse with a 360-degree lidar and localization sensors.
+# Small differential-drive micromouse with front-facing LiDAR and localization sensors.
 PROTO Micromouse [
   field SFVec3f    translation        0 0 0
   field SFRotation rotation           0 0 1 0
@@ -95,12 +95,12 @@ Robot {
         physics Physics { density -1 mass 0.008 }
       }
     }
-    # Full planar 360-degree scan; the Q table consumes eight sector minima.
+    # Planar scan centered on the front of the robot.
     Lidar {
       name "lidar"
       translation 0 0 0.14
       horizontalResolution 128
-      fieldOfView 6.283185
+      fieldOfView 3.141593
       verticalFieldOfView 0.05
       numberOfLayers 1
       near 0.02

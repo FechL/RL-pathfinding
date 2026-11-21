@@ -2,8 +2,9 @@
 
 Posisi start dan goal berasal dari world Webots. Robot memakai GPS dan IMU
 untuk mengenali posisi serta arah hadapnya. Dari setiap sel yang dicapai,
-LiDAR memeriksa bukaan ke sel tetangga. DFS memilih cabang yang belum dicoba,
-membuat target lokal, dan kembali ke sel sebelumnya saat cabang buntu.
+LiDAR 180° memeriksa bukaan di depan. Jika cabang berada di luar bidang
+pandang, robot berputar untuk memindainya. DFS memilih cabang yang belum
+dicoba, membuat target lokal, dan berbalik untuk kembali saat cabang buntu.
 Layout tembok lengkap hanya dipakai untuk tampilan dan pemeriksaan tabrakan.
 Q-learning memilih aksi roda ke target lokal yang dibuat oleh pencarian.
 
@@ -25,7 +26,7 @@ urutan pemilihan cabang yang sama.
 Training menjalankan pencarian dari start hingga goal, tabrakan, timeout,
 atau semua cabang yang terdeteksi sudah dicoba. Grafik reward dan tombol
 **BUKA Q-TABLE** tetap tersedia. Statistik episode tersimpan di
-`reports/lidar_q_learning/runs/`. Q-table versi 8 tetap kompatibel.
+`reports/lidar_q_learning/runs/`. Latih ulang Q-table untuk lima sektor LiDAR depan (versi 9).
 Untuk latihan tanpa jendela, jalankan `bash run.sh train --no-render`.
 
 ## Optional legacy continuous SAC

@@ -153,13 +153,9 @@ class NavigationMap:
         return self.wall_centers[nearby], self.wall_halves[nearby]
 
     def lidar_scan(self, pose, resolution=128, maximum=4.):
-        """Simulate a 360-degree planar lidar scan in Webots beam order.
-
-        Beam zero points to the robot's right (-90 degrees); scans proceed
-        counter-clockwise through a complete revolution.
-        """
+        """Simulate a planar, front-facing 180-degree LiDAR scan."""
         pose = np.asarray(pose, dtype=float)
-        relative = -math.pi/2 + np.arange(resolution)*2*math.pi/resolution
+        relative = np.linspace(-math.pi / 2, math.pi / 2, resolution)
         angles = pose[2]+relative
         directions = np.stack([np.cos(angles), np.sin(angles)], axis=1)
         nearby = np.all(np.abs(self.wall_centers-pose[:2]) <= self.wall_halves+maximum+.1, axis=1)

@@ -5,6 +5,7 @@ import random
 import numpy as np
 
 from planner import ROBOT_RADIUS
+from lidar_qlearning import STOP_ACTION, beam_angles, safe_actions
 
 DIRECTIONS = ((1, 0), (0, 1), (-1, 0), (0, -1))
 
@@ -18,7 +19,7 @@ def world_scan(pose, local_hits):
 
 
 def synthetic_hits(ranges):
-    angles = -math.pi / 2 + np.arange(len(ranges)) * (2 * math.pi / len(ranges))
+    angles = beam_angles(len(ranges))
     hit = ranges < 4.
     return ranges[hit, None] * np.column_stack((np.cos(angles[hit]), np.sin(angles[hit])))
 
@@ -35,6 +36,9 @@ class LidarMazeSearch:
         self.stack = [self.cell(start)]
         self.visited = set(self.stack)
         self.edges = {}
+        self.checked = {}
+        self.order = {}
+        self.scan_bearing = None
         self.route = []
         self.replay = iter(replay)
         self.replaying = bool(replay)
@@ -60,8 +64,13 @@ class LidarMazeSearch:
         return not np.any((longitudinal >= 0) & (longitudinal <= length + .04)
                           & (lateral <= ROBOT_RADIUS + .02))
 
+    def scan_action(self, sectors):
+        pivot = 3 if self.scan_bearing >= 0 else 4
+        return pivot if pivot in safe_actions(sectors) else STOP_ACTION
+
     def next_target(self, pose, local_hits):
         """Observe a reached cell and choose one unvisited branch or backtrack."""
+        self.scan_bearing = None
         if self.replaying:
             target = tuple(next(self.replay, self.goal))
             self.final = target == self.goal
@@ -75,30 +84,56 @@ class LidarMazeSearch:
             return self.route[-1]
 
         hits = world_scan(pose, local_hits)
-        if (math.dist(center, self.goal) <= .75 * self.size
-                and self.clear_corridor(pose[:2], np.asarray(self.goal), hits)):
-            self.final = True
-            self.route.append(self.goal)
-            return self.goal
 
-        if cell not in self.edges:
+        def bearing(point):
+            dx, dy = np.asarray(point) - pose[:2]
+            return (math.atan2(dy, dx) - pose[2] + math.pi) % (2 * math.pi) - math.pi
+
+        # Keep the entire corridor probe well inside the front scan, so an
+        # unseen opening cannot be mistaken for an observed clear passage.
+        visible_angle = math.radians(55)
+        if math.dist(center, self.goal) <= .75 * self.size:
+            goal_bearing = bearing(self.goal)
+            if abs(goal_bearing) > visible_angle and math.dist(pose[:2], self.goal) > .09:
+                self.scan_bearing = goal_bearing
+                return None
+            if self.clear_corridor(pose[:2], np.asarray(self.goal), hits):
+                self.final = True
+                self.route.append(self.goal)
+                return self.goal
+
+        if cell not in self.order:
             neighbors = []
             for dx, dy in DIRECTIONS:
                 neighbor = (cell[0] + dx, cell[1] + dy)
-                if not all(0 <= index < limit for index, limit in zip(neighbor, self.shape)):
-                    continue
-                # Check through the shared boundary, stopping before the next
-                # cell's far wall. Side walls outside the robot's width are ignored.
-                probe = center + .69 * (self.center(neighbor) - center)
-                if self.clear_corridor(center, probe, hits):
+                if all(0 <= index < limit for index, limit in zip(neighbor, self.shape)):
                     neighbors.append(neighbor)
-            self.edges[cell] = sorted(
+            self.order[cell] = sorted(
                 neighbors,
                 key=lambda neighbor: math.dist(self.center(neighbor), self.goal)
                 + self.rng.uniform(0, 2.5 * self.size),
             )
+            self.checked[cell] = set()
+            self.edges[cell] = set()
 
-        neighbor = next((n for n in self.edges[cell] if n not in self.visited), None)
+        unknown = []
+        for neighbor in self.order[cell]:
+            if neighbor in self.checked[cell] or neighbor in self.visited:
+                continue
+            probe = center + .69 * (self.center(neighbor) - center)
+            direction = bearing(probe)
+            if abs(direction) > visible_angle:
+                unknown.append(direction)
+                continue
+            self.checked[cell].add(neighbor)
+            if self.clear_corridor(center, probe, hits):
+                self.edges[cell].add(neighbor)
+
+        neighbor = next((n for n in self.order[cell]
+                         if n in self.edges[cell] and n not in self.visited), None)
+        if neighbor is None and unknown:
+            self.scan_bearing = unknown[0]
+            return None
         if neighbor is not None:
             self.stack.append(neighbor)
             self.visited.add(neighbor)

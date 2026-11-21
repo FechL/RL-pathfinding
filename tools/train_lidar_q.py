@@ -40,34 +40,38 @@ def run_episode(env, agent, epsilon, heading, max_steps, *, seed, learn,
                              env.nav.cell_size, seed=seed)
     env.reset(heading=heading)
     target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
-    exhausted = target is None
-    state = env.last_state if exhausted else env.set_waypoint(target)
+    exhausted = target is None and search.scan_bearing is None
+    state = env.last_state if target is None else env.set_waypoint(target)
     env.waypoint_index = len(search.route)
     total=0.;collision=False;success=False;updates=0;info={}
-    min_front = float(min(env.lidar_sectors[[7,0,1]]))
+    min_front = float(min(env.lidar_sectors[[4,0,1]]))
     recovery=WaypointRecovery()
-    allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,0.)
+    allowed = recovery.actions(env.pose,env.goal,env.lidar_sectors,0.)
     for _ in range(0 if exhausted else max_steps):
-        if learn:
+        scanning = target is None
+        if scanning:
+            action = search.scan_action(env.lidar_sectors)
+        elif learn:
             action=agent.choose(state,epsilon,allowed)
         else:
             values=agent.values(state)
             action=max(allowed,key=lambda a:float(values[a]))
-        next_state,reward,terminated,truncated,info=env.step(action,final_goal=search.final)
+        next_state,reward,terminated,truncated,info=env.step(action,final_goal=search.final,scanning=scanning)
         min_front=min(min_front,float(info['front_clearance_m']))
-        if info['waypoint_reached'] and not (terminated or truncated):
+        if (scanning or info['waypoint_reached']) and not (terminated or truncated):
             target = search.next_target(env.pose, synthetic_hits(env.lidar_scan))
-            exhausted = target is None
-            if not exhausted:
+            exhausted = target is None and search.scan_bearing is None
+            if target is not None:
                 env.waypoint_index = len(search.route)
                 next_state = env.set_waypoint(target)
                 recovery = WaypointRecovery()
         allowed=recovery.actions(env.pose,env.goal,env.lidar_sectors,
                                  env.steps*env.decision_seconds)
+        env.scanning = scanning
         env.recovery_active=recovery.active
-        env.allowed_actions=allowed
-        if learn:
-            agent.update(state,action,reward,next_state,terminated or exhausted,
+        env.allowed_actions = (search.scan_action(env.lidar_sectors),) if target is None and not exhausted else allowed
+        if learn and not scanning:
+            agent.update(state,action,reward,next_state,terminated or target is None,
                          allowed)
         state=next_state;total+=reward;updates+=1
         if view and not view.update(env,agent,episode,epsilon,steps_offset+updates):
@@ -143,8 +147,8 @@ def main():
     manifest=dict(created_at_utc=created.isoformat(),seed=args.seed,episodes=args.episodes,
                   max_steps=env.max_steps,step_duration_s=env.decision_seconds,
                   alpha=args.alpha,gamma=args.gamma,exploration_fraction=args.exploration_fraction,
-                  lidar='360-degree planar LiDAR; 128 returns aggregated to 8 sectors, 6 compact state features',
-                  state_schema='relative bearing to next DFS waypoint 8 bins, waypoint distance 4 bins, six LiDAR sectors 3 bins',
+                  lidar='front-facing 180-degree LiDAR; 128 returns aggregated to five sectors',
+                  state_schema='relative bearing to next DFS waypoint 8 bins, waypoint distance 4 bins, five forward LiDAR sectors 3 bins',
                   state_space_upper_bound=STATE_SPACE_SIZE,
                   action_names=ACTION_NAMES,
                   role='tabular Q-learning controls continuous differential-drive motion for an online LiDAR search from maze start to goal',
